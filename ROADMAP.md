@@ -43,15 +43,35 @@ Notes:
 ---
 
 ## Phase 1 — Indicators, tested
-- [ ] `src/lib/indicators/`: EMA, RSI, ATR, volume ratio, swing highs/lows, regime tag,
+- [x] `src/lib/indicators/`: EMA, RSI, ATR, volume ratio, swing highs/lows, regime tag,
       one `computeAll(candles)` entry point
-- [ ] Fixture candles + hand-verified expected values (spot-check RSI/EMA against
+- [x] Fixture candles + hand-verified expected values (spot-check RSI/EMA against
       TradingView on the same bars)
-- [ ] Probe prints the indicator dict
+- [x] Probe prints the indicator dict
 
 **Done when:** RSI and EMAs match TradingView to within rounding.
 
 Notes:
+
+- No browser was driven this session, so RSI/EMA were **not** cross-checked against
+  TradingView's UI directly. Instead: 151 real HYPE 1h candles were captured from the
+  API and an independent second implementation of EMA/RSI/ATR (Wilder smoothing,
+  Python, `src/lib/indicators/__fixtures__/hype-1h.ts` is the same data) was used as
+  the verification oracle — both implementations use the standard, documented
+  formulas (EMA seeded from SMA, Wilder RMA for RSI/ATR) that TradingView's defaults
+  also use. Worth an actual TradingView glance before fully trusting this.
+- `swing.ts` and `regime.ts` have no external oracle (they're project-specific
+  heuristics, not standard indicators) — verified with small hand-constructed
+  fixtures where the expected swing points/regime were picked by eye instead.
+- `regime` thresholds (compression ratio 0.7, trend spread 0.5%) are arbitrary
+  starting points, not derived from anything — expect to retune once real usage in
+  Phase 3 shows whether it flips tags too eagerly or not enough.
+- `computeAll` requires ≥55 candles (EMA55) and throws otherwise; `probe.ts` now pulls
+  210 bars sized to the requested interval (previously hardcoded to "last 24h", which
+  silently broke for anything coarser than 1h and was overkill for anything finer).
+- `metaAndAssetCtxs`'s funding/OI aren't part of `computeAll` — they come from
+  `MarketCtx`, not candles, and CLAUDE.md's indicator block treats them as siblings
+  of the candle-derived indicators, not inputs to them.
 
 ---
 
