@@ -4,11 +4,15 @@
 
 A view-only, single-user web portal for reading Hyperliquid perp markets. Terminal
 aesthetic, keyboard-first. For the selected coin/interval it shows live price data, a
-deterministic indicator block that updates on every tick, a small candle chart, and an
-AI "read" that refreshes on candle close or on demand. No order execution — trades
-happen elsewhere. The AI panel's "trade suggestion" is a local, hypothetical paper
-position (entry/target/stop, live PnL against real price) for tracking a thesis — it
-never places, signs, or touches a real order.
+candle chart, and an AI "read" that refreshes on candle close or on demand. No order
+execution — trades happen elsewhere. The AI panel's "trade suggestion" is a local,
+hypothetical paper position (entry/target/stop, live PnL against real price) for
+tracking a thesis — it never places, signs, or touches a real order.
+
+Indicators (bias, RSI, ATR%, volume ratio, swing support/resistance, regime — see
+"Indicator block (v1 scope)") are still computed deterministically every tick; there is
+no dedicated visual panel for them (dropped in Phase 6 to match the imported design),
+but they still drive the chart's price lines and the AI trade suggestion's target/stop.
 
 ## Non-goals (do not build these)
 
@@ -46,7 +50,7 @@ src/
   lib/ai/          # Context payload builder + client for /api/read, /api/ask
   lib/sim.ts       # Pure paper-position PnL/verdict helpers. No I/O. Tested.
   hooks/           # useCandles(coin, interval), useIndicators(), useAiRead()
-  components/      # TopBar, IndicatorBlock, ChartPanel, AiPanel, CommandPalette, Watchlist
+  components/      # TopBar, ChartPanel, AiPanel, CommandPalette, Watchlist
   App.tsx
 server/
   index.ts         # Hono: /api/read, /api/ask (SSE streaming), optional /api/hl proxy
@@ -65,7 +69,9 @@ scripts/
 
 Bias (EMA 9/21/55 stack), RSI 14, ATR 14 as % of price, volume vs 20-bar average,
 nearest swing support/resistance with % distance, funding rate, OI + OI change over
-lookback, one-word regime tag (trending / ranging / compressing).
+lookback, one-word regime tag (trending / ranging / compressing). Computed by
+`lib/indicators` on every tick; consumed by the AI context and the chart/trade
+suggestion, not rendered as its own panel (see "What this is").
 
 ## AI read contract
 

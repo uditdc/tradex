@@ -1,7 +1,6 @@
 import { AiPanel } from './components/AiPanel'
 import { ChartPanel } from './components/ChartPanel'
 import { CommandPalette } from './components/CommandPalette'
-import { IndicatorBlock } from './components/IndicatorBlock'
 import { StatusLine } from './components/StatusLine'
 import { TopBar } from './components/TopBar'
 import { Watchlist } from './components/Watchlist'
@@ -22,7 +21,6 @@ function App() {
       <TopBar />
       <Watchlist />
       <div className="flex min-h-0 flex-1">
-        <IndicatorBlock />
         <div className="min-w-0 flex-1">
           <ChartPanel />
         </div>

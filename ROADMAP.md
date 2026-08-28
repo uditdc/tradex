@@ -311,6 +311,9 @@ Notes:
 - [x] Status line shows total Sim P&L when any paper position is open
 - [x] Command palette simplified to Coin + Interval only (matches the design import),
       openable via `:` or Cmd/Ctrl+K
+- [x] Left indicator sidebar removed to match the mockup's layout (top bar / chart /
+      AI panel, no fourth column) — flagged and confirmed with the user first, since
+      it's a documented v1 feature, not a restyle
 
 **Done when:** the imported `Tradex.dc.html` design's UI/UX changes are reflected in
 the real app against real data, with the two genuinely-new pieces (AI zones, paper
@@ -352,6 +355,18 @@ Notes:
 - Added `src/lib/sim.ts` (pure, tested) for PnL/verdict math — reused by both
   `AiPanel` and `StatusLine`'s Sim P&L total, matching the project's "pure function,
   no I/O" convention for `lib/`.
+- The mockup's layout has no left indicator column at all (top bar / chart / AI panel
+  only) — initially left `IndicatorBlock` in place since it wasn't mentioned in the
+  earlier scoping question, then removed it once flagged: bias/RSI/ATR/volume-ratio/
+  swing-levels/regime are documented v1 scope in "Indicator block (v1 scope)" and
+  called out as a *deterministic, separate-from-AI* feature in CLAUDE.md's opening
+  section, so this was a real feature deletion, not a restyle — confirmed with the
+  user (`AskUserQuestion`) before deleting `IndicatorBlock.tsx` and its now-orphaned
+  `ui/badge.tsx` / `ui/skeleton.tsx`. The underlying `lib/indicators` computation is
+  untouched and still runs every tick — it just has no dedicated panel anymore; it
+  still drives the chart's key-level lines and the AI trade suggestion's target/stop.
+  Deterministic bias/regime badges are gone from the UI; only the AI's own bias read
+  remains visible.
 
 ---
 
