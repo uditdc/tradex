@@ -296,6 +296,65 @@ Notes:
 
 ---
 
+## Phase 6 — Design import: AI zones, paper trading, palette simplification
+- [x] AI read contract extended with an optional `zones` field (shaded supply/demand
+      price ranges), drawn on the chart as violet bands alongside key-level lines
+- [x] Top bar reskin: coin-switcher dropdown, Oracle price, 24h Volume, funding
+      countdown-to-next-hour, dotted-underline field labels
+- [x] Chart header gets an interval tab strip (was palette-only before) plus an
+      "AI Zones" indicator when the active read has any
+- [x] AI panel: violet AI accent, collapsible bias/rationale accordion, zones list
+- [x] Paper-trading simulator in the AI panel: size/leverage sliders, an AI-derived
+      trade suggestion (side from bias, target/stop from swing levels), "OPEN
+      (PAPER)" positions with live PnL, manual "Re-run AI" KEEP/CLOSE verdict —
+      pure local state, no real order ever placed
+- [x] Status line shows total Sim P&L when any paper position is open
+- [x] Command palette simplified to Coin + Interval only (matches the design import),
+      openable via `:` or Cmd/Ctrl+K
+
+**Done when:** the imported `Tradex.dc.html` design's UI/UX changes are reflected in
+the real app against real data, with the two genuinely-new pieces (AI zones, paper
+trading) scoped through explicit user confirmation rather than assumed.
+
+Notes:
+
+- Source: a Claude Design project mockup (`Tradex.dc.html` + `support.js`), a
+  self-contained fake-data demo, not literal code — ported the *design*, not the
+  file, onto real Hyperliquid data/indicators/AI reads.
+- Three points were flagged back to the user before building (`AskUserQuestion`)
+  since they were new functionality, not restyling: (1) AI zones — approved, extends
+  the read contract; (2) a full trade-execution panel with an "EXECUTE" button —
+  approved only as a renamed, pure-local paper-trading tracker ("OPEN (PAPER)"),
+  since a real EXECUTE would contradict CLAUDE.md's non-goals; (3) the command
+  palette's Actions/ask-mode/lookback-presets content — user chose to match the
+  mockup exactly (Coin + Interval only).
+- On (3): CLAUDE.md's "Design direction" section explicitly locks `/` as the
+  ask-the-AI palette trigger, and Ask-the-AI is a whole separate, tested, real
+  feature (its own `/api/ask` route, hook, state) that the mockup simply never
+  depicted — dropping it wasn't part of what was actually asked about, so `/` still
+  opens ask-mode unchanged. What *did* get dropped from the palette per the
+  approved answer: "read now", watchlist toggle, "set default interval", and
+  "download log" — those store/lib functions (`setDefaultInterval`, `toggleWatchlist`,
+  `downloadReadLog`) are still defined and tested but now have no UI entry point.
+  Worth a follow-up if that's not what was intended.
+- Paper positions only get a live price (and thus PnL) when their coin is either the
+  currently active one (from the live candle feed) or on the watchlist (from the
+  45s poll) — this app has no live subscription for an arbitrary coin. Same
+  constraint applies to the "Re-run AI" verdict: swing support/resistance is only
+  ever loaded for the active coin/interval, so a position on any other pair shows
+  "switch to X to re-evaluate" instead of a stale guess.
+- Zone rendering: `lightweight-charts` v5 has no built-in shaded-band primitive, so
+  `ChartPanel` converts each zone's price bounds to pixel coordinates via
+  `series.priceToCoordinate` and overlays absolutely-positioned divs, recomputed on
+  zoom/pan (`timeScale().subscribeVisibleLogicalRangeChange`) and container resize
+  (`ResizeObserver`) — same technique the mockup itself used, just against a real
+  chart instead of `%`-based fake coordinates.
+- Added `src/lib/sim.ts` (pure, tested) for PnL/verdict math — reused by both
+  `AiPanel` and `StatusLine`'s Sim P&L total, matching the project's "pure function,
+  no I/O" convention for `lib/`.
+
+---
+
 ## Parking lot (ideas, not commitments)
 - Alerts: price crosses an AI level, funding flip, RSI extreme → Sonner toast + sound
 - Fast model for auto-reads, stronger model for `/` questions

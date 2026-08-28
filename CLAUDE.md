@@ -6,11 +6,15 @@ A view-only, single-user web portal for reading Hyperliquid perp markets. Termin
 aesthetic, keyboard-first. For the selected coin/interval it shows live price data, a
 deterministic indicator block that updates on every tick, a small candle chart, and an
 AI "read" that refreshes on candle close or on demand. No order execution — trades
-happen elsewhere.
+happen elsewhere. The AI panel's "trade suggestion" is a local, hypothetical paper
+position (entry/target/stop, live PnL against real price) for tracking a thesis — it
+never places, signs, or touches a real order.
 
 ## Non-goals (do not build these)
 
-- Order placement, wallet connection, signing, keys of any kind in the browser
+- Order placement, wallet connection, signing, keys of any kind in the browser —
+  the paper-trading simulator is exempt only because it is pure local state with no
+  real order ever sent; it must never grow a real execution path
 - Auth, multi-user anything, databases
 - Backtesting or strategy tooling
 - Server-side rendering; this is a local tool, not a deployed product
@@ -40,6 +44,7 @@ src/
   lib/hl/          # REST snapshot, WS candle subscription, candle buffer. No React.
   lib/indicators/  # Pure functions: candles in, numbers out. No I/O. Fully tested.
   lib/ai/          # Context payload builder + client for /api/read, /api/ask
+  lib/sim.ts       # Pure paper-position PnL/verdict helpers. No I/O. Tested.
   hooks/           # useCandles(coin, interval), useIndicators(), useAiRead()
   components/      # TopBar, IndicatorBlock, ChartPanel, AiPanel, CommandPalette, Watchlist
   App.tsx
@@ -54,7 +59,7 @@ scripts/
 - Indicators are pure and deterministic; test against hand-verified fixtures.
 - The AI layer never computes indicators; it receives them.
 - One store (zustand) holds: coin, interval, candle buffer, indicator dict, AI read
-  cache keyed by `${coin}:${interval}`.
+  cache keyed by `${coin}:${interval}`, and the paper-trading simulator's positions.
 
 ## Indicator block (v1 scope)
 
@@ -66,9 +71,10 @@ lookback, one-word regime tag (trending / ranging / compressing).
 
 Input: symbol, interval, last N candles (config, default 200), indicator dict, funding,
 OI, top-5 book levels. Output: strict JSON — `bias`, `key_levels` [{price, kind, note}],
-`invalidation`, `confidence` (0–1), `rationale` (≤3 sentences). Parse strictly; on
-failure show raw text in the panel and log it. `key_levels` get drawn on the chart as
-price lines.
+`zones` [{from, to, label}] (optional, 0-3 supply/demand ranges), `invalidation`,
+`confidence` (0–1), `rationale` (≤3 sentences). Parse strictly; on failure show raw text
+in the panel and log it. `key_levels` get drawn on the chart as price lines; `zones` get
+drawn as shaded bands.
 
 ## Design direction (locked — do not re-invent per session)
 
@@ -76,15 +82,17 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
 
 - Palette: `#0B0D10` background, `#14181D` panel, `#2A313A` hairline borders,
   `#E8B45A` amber for live data and emphasis, `#9AA4B2` muted labels,
-  `#4ADE80` / `#F87171` strictly for long/short–up/down semantics, never decoration.
+  `#4ADE80` / `#F87171` strictly for long/short–up/down semantics, never decoration,
+  `#A78BFA` violet reserved for AI-generated overlays (zones, AI Read accent, trade
+  suggestion) so they read as distinct from live market data.
 - Type: JetBrains Mono everywhere. Data at `text-sm` with `tabular-nums`; labels
   uppercase `text-[11px] tracking-widest` muted. No display font, no hero anything.
 - Layout: fixed viewport grid, no page scroll. Top bar / left indicator column /
   center chart / right AI panel / bottom status line. Panels are hairline-bordered,
   near-flat (rounded-sm), no shadows, no gradients.
-- Signature: the command palette. `:` opens it (cmdk) for coin/interval/actions,
-  `/` opens it in ask-the-AI mode. Every action is reachable by keyboard; the mouse
-  is optional. Number keys 1–6 jump watchlist slots.
+- Signature: the command palette. `:` or Cmd/Ctrl+K opens it (cmdk) for coin/interval
+  jumps, `/` opens it in ask-the-AI mode. Every action is reachable by keyboard; the
+  mouse is optional. Number keys 1–6 jump watchlist slots.
 - Motion: value-change flashes (amber tick, brief green/red on delta) and streaming
   text in the AI panel. Nothing else animates. Respect reduced motion.
 - shadcn components get restyled to these tokens in `index.css` theme variables once,

@@ -19,6 +19,9 @@ exactly this shape:
 {
   "bias": string,              // e.g. "long", "short", or "neutral"
   "key_levels": [{"price": number, "kind": string, "note": string}],
+  "zones": [{"from": number, "to": number, "label": string}],  // optional supply/demand price ranges,
+                                                                 // 0-3 of them; omit or use [] if none
+                                                                 // stand out — do not force one
   "invalidation": string,      // the condition that would invalidate this read
   "confidence": number,        // 0 to 1
   "rationale": string          // at most 3 sentences

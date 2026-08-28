@@ -1,4 +1,4 @@
-import type { AiRead, KeyLevel } from './types'
+import type { AiRead, KeyLevel, Zone } from './types'
 
 function isKeyLevel(v: unknown): v is KeyLevel {
   return (
@@ -7,6 +7,16 @@ function isKeyLevel(v: unknown): v is KeyLevel {
     typeof (v as KeyLevel).price === 'number' &&
     typeof (v as KeyLevel).kind === 'string' &&
     typeof (v as KeyLevel).note === 'string'
+  )
+}
+
+function isZone(v: unknown): v is Zone {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    typeof (v as Zone).from === 'number' &&
+    typeof (v as Zone).to === 'number' &&
+    typeof (v as Zone).label === 'string'
   )
 }
 
@@ -29,12 +39,16 @@ export function parseAiRead(text: string): AiRead | null {
     return null
   }
 
+  const zones = (parsed as AiRead | null)?.zones
+  const zonesValid = zones === undefined || (Array.isArray(zones) && zones.every(isZone))
+
   if (
     typeof parsed === 'object' &&
     parsed !== null &&
     typeof (parsed as AiRead).bias === 'string' &&
     Array.isArray((parsed as AiRead).key_levels) &&
     (parsed as AiRead).key_levels.every(isKeyLevel) &&
+    zonesValid &&
     typeof (parsed as AiRead).invalidation === 'string' &&
     typeof (parsed as AiRead).confidence === 'number' &&
     typeof (parsed as AiRead).rationale === 'string'

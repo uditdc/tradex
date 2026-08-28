@@ -57,6 +57,7 @@
     --color-term-muted: #9AA4B2;
     --color-term-up: #4ADE80;
     --color-term-down: #F87171;
+    --color-term-violet: #A78BFA;
 }
 
 :root {
@@ -125,4 +126,39 @@
 
 @media (prefers-reduced-motion: reduce) {
   .flash-amber, .flash-up, .flash-down { animation: none; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.pulse-glow { animation: pulse-glow 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pulse-glow { animation: none; }
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: var(--color-term-border);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-term-amber);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-term-amber);
+  border: none;
+  cursor: pointer;
 }

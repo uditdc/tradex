@@ -18,10 +18,18 @@ export interface KeyLevel {
   note: string
 }
 
+/** A shaded supply/demand price range, drawn as a band on the chart. Optional — the model may return none. */
+export interface Zone {
+  from: number
+  to: number
+  label: string
+}
+
 /** Strict output contract the model is asked to produce for /api/read. */
 export interface AiRead {
   bias: string
   key_levels: KeyLevel[]
+  zones?: Zone[]
   invalidation: string
   confidence: number
   rationale: string

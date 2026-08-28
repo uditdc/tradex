@@ -31,4 +31,14 @@ describe('parseAiRead', () => {
     const bad = { ...validRead, key_levels: [{ price: 'not-a-number', kind: 'support', note: 'x' }] }
     expect(parseAiRead(JSON.stringify(bad))).toBeNull()
   })
+
+  it('parses valid zones', () => {
+    const withZones = { ...validRead, zones: [{ from: 80, to: 82, label: 'AI Demand Zone' }] }
+    expect(parseAiRead(JSON.stringify(withZones))).toEqual(withZones)
+  })
+
+  it('returns null when a zone is malformed', () => {
+    const bad = { ...validRead, zones: [{ from: 80, to: 'not-a-number', label: 'AI Demand Zone' }] }
+    expect(parseAiRead(JSON.stringify(bad))).toBeNull()
+  })
 })

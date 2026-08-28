@@ -9,14 +9,12 @@ import {
   CommandList,
   CommandSeparator,
 } from './ui/command'
-import { triggerAsk, triggerRead } from '../hooks/useAiRead'
-import { downloadReadLog } from '../lib/ai/log'
+import { triggerAsk } from '../hooks/useAiRead'
 import { INTERVAL_MS } from '../lib/hl/intervals'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
 
 const INTERVALS = Object.keys(INTERVAL_MS)
-const LOOKBACK_PRESETS = [100, 210, 300, 500]
 
 type Mode = 'command' | 'ask'
 
@@ -32,17 +30,12 @@ export function CommandPalette() {
   const coin = useAppStore((s) => s.coin)
   const interval = useAppStore((s) => s.interval)
   const setCoinInterval = useAppStore((s) => s.setCoinInterval)
-  const readLog = useAppStore((s) => s.readLog)
   const watchlist = useConfigStore((s) => s.watchlist)
-  const defaultInterval = useConfigStore((s) => s.defaultInterval)
-  const lookback = useConfigStore((s) => s.lookback)
-  const toggleWatchlist = useConfigStore((s) => s.toggleWatchlist)
-  const setDefaultInterval = useConfigStore((s) => s.setDefaultInterval)
-  const setLookback = useConfigStore((s) => s.setLookback)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === ':' && !isTypingTarget(e.target)) {
+      const isPaletteShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
+      if ((e.key === ':' || isPaletteShortcut) && !isTypingTarget(e.target)) {
         e.preventDefault()
         setMode('command')
         setOpen(true)
@@ -62,19 +55,12 @@ export function CommandPalette() {
     setOpen(false)
   }
 
-  function runRead() {
-    setOpen(false)
-    void triggerRead()
-  }
-
   function submitAsk() {
     const question = askQuery.trim()
     if (!question) return
     setOpen(false)
     void triggerAsk(question)
   }
-
-  const isOnWatchlist = watchlist.includes(coin)
 
   if (mode === 'ask') {
     return (
@@ -99,39 +85,9 @@ export function CommandPalette() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen} title="Command palette" description="Switch coin or interval">
       <Command>
-        <CommandInput placeholder="Jump to coin, interval, or action..." />
+        <CommandInput placeholder="Jump to coin or interval..." />
         <CommandList>
           <CommandEmpty>No match.</CommandEmpty>
-          <CommandGroup heading="Actions">
-            <CommandItem value="read" onSelect={runRead}>
-              Read current market
-            </CommandItem>
-            <CommandItem
-              value={isOnWatchlist ? 'remove watchlist' : 'add watchlist'}
-              onSelect={() => toggleWatchlist(coin)}
-            >
-              {isOnWatchlist ? `Remove ${coin} from watchlist` : `Add ${coin} to watchlist`}
-            </CommandItem>
-            <CommandItem
-              value="set default interval"
-              disabled={interval === defaultInterval}
-              onSelect={() => setDefaultInterval(interval)}
-            >
-              Set default interval to {interval}
-              {interval === defaultInterval && <span className="text-term-muted ml-auto text-xs">current</span>}
-            </CommandItem>
-            <CommandItem
-              value="download log"
-              disabled={readLog.length === 0}
-              onSelect={() => {
-                downloadReadLog(readLog)
-                setOpen(false)
-              }}
-            >
-              Download read log ({readLog.length})
-            </CommandItem>
-          </CommandGroup>
-          <CommandSeparator />
           <CommandGroup heading="Coin">
             {watchlist.map((c) => (
               <CommandItem key={c} value={c} onSelect={() => select(c, interval)}>
@@ -146,20 +102,6 @@ export function CommandPalette() {
               <CommandItem key={i} value={i} onSelect={() => select(coin, i)}>
                 {i}
                 {i === interval && <span className="text-term-muted ml-auto text-xs">current</span>}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandSeparator />
-          <CommandGroup heading="Watchlist lookback (bars)">
-            {LOOKBACK_PRESETS.map((n) => (
-              <CommandItem
-                key={n}
-                value={`lookback ${n}`}
-                disabled={n === lookback}
-                onSelect={() => setLookback(n)}
-              >
-                {n}
-                {n === lookback && <span className="text-term-muted ml-auto text-xs">current</span>}
               </CommandItem>
             ))}
           </CommandGroup>
