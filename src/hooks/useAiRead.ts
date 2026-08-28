@@ -2,19 +2,19 @@ import { useEffect, useRef } from 'react'
 import { buildContext } from '../lib/ai/context'
 import { requestAsk, requestRead } from '../lib/ai/client'
 import { parseAiRead } from '../lib/ai/parse'
+import type { AiRead } from '../lib/ai/types'
 import { MIN_CANDLES, computeAll } from '../lib/indicators'
-import { l2Book } from '../lib/hl/rest'
+import { l2Book, metaAndAssetCtxs } from '../lib/hl/rest'
+import type { Candle, MarketCtx } from '../lib/hl/types'
 import { useAppStore } from '../store'
 
 function cacheKey(coin: string, interval: string): string {
   return `${coin}:${interval}`
 }
 
-/** Imperative trigger for /api/read; safe to call directly (palette action, bar close, auto-trigger). */
-export async function triggerRead(): Promise<void> {
-  const { coin, interval, candles, marketCtx, setAiRead } = useAppStore.getState()
-  if (candles.length < MIN_CANDLES || !marketCtx) return
-
+/** Core of an AI read for an arbitrary coin/interval; shared by the active-coin and background paths. */
+async function runRead(coin: string, interval: string, candles: Candle[], marketCtx: MarketCtx): Promise<AiRead | null> {
+  const { setAiRead, addLogEntry } = useAppStore.getState()
   const key = cacheKey(coin, interval)
   setAiRead(key, { status: 'streaming', text: '', parsed: null })
 
@@ -37,16 +37,37 @@ export async function triggerRead(): Promise<void> {
       parsed,
       error: parsed ? undefined : 'Model did not return strict JSON — showing raw text.',
     })
+    addLogEntry({ timestamp: Date.now(), coin, interval, kind: 'read', text: acc, parsed })
+    return parsed
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('AI read failed:', err)
     setAiRead(key, { status: 'error', text: '', parsed: null, error: message })
+    return null
   }
+}
+
+/** Imperative trigger for /api/read on the currently active coin/interval. */
+export async function triggerRead(): Promise<void> {
+  const { coin, interval, candles, marketCtx } = useAppStore.getState()
+  if (candles.length < MIN_CANDLES || !marketCtx) return
+  await runRead(coin, interval, candles, marketCtx)
+}
+
+/**
+ * Background read for a coin/interval that isn't necessarily the active one (the
+ * watchlist's bar-close pre-compute). Fetches its own snapshot rather than reusing
+ * the live buffer, since only the active coin has a live WS subscription.
+ */
+export async function triggerReadFor(coin: string, interval: string, candles: Candle[]): Promise<void> {
+  if (candles.length < MIN_CANDLES) return
+  const marketCtx = await metaAndAssetCtxs(coin)
+  await runRead(coin, interval, candles, marketCtx)
 }
 
 /** Imperative trigger for /api/ask (the "/" ask-mode palette action). */
 export async function triggerAsk(question: string): Promise<void> {
-  const { coin, interval, candles, marketCtx, setAskState } = useAppStore.getState()
+  const { coin, interval, candles, marketCtx, setAskState, addLogEntry } = useAppStore.getState()
   if (candles.length < MIN_CANDLES || !marketCtx) return
 
   setAskState({ status: 'streaming', text: '', question })
@@ -62,6 +83,7 @@ export async function triggerAsk(question: string): Promise<void> {
       setAskState({ status: 'streaming', text: acc, question })
     })
     setAskState({ status: 'done', text: acc, question })
+    addLogEntry({ timestamp: Date.now(), coin, interval, kind: 'ask', question, text: acc, parsed: null })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('AI ask failed:', err)

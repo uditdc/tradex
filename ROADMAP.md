@@ -245,14 +245,54 @@ Notes:
 ---
 
 ## Phase 5 — Daily-utility polish
-- [ ] Watchlist row: 5–6 coins, price + bias colour, keys 1–6 to jump
-- [ ] Background pre-compute of reads for watchlist coins on bar close
-- [ ] Config in localStorage via the palette: watchlist, default interval, lookback
-- [ ] Read log (download as text) to review AI quality later
+- [x] Watchlist row: 5–6 coins, price + bias colour, keys 1–6 to jump
+- [x] Background pre-compute of reads for watchlist coins on bar close
+- [x] Config in localStorage via the palette: watchlist, default interval, lookback
+- [x] Read log (download as text) to review AI quality later
 
 **Done when:** a full trading session without touching the probe scripts or devtools.
 
 Notes:
+
+- The watchlist *is* the palette's coin list now — the hardcoded `COINS` constant
+  flagged as a known gap in Phase 3's notes is gone; `CommandPalette`'s "Coin" group
+  reads `useConfigStore`'s `watchlist` directly, so adding/removing a coin from the
+  palette immediately changes both.
+- Config (`watchlist`, `defaultInterval`, `lookback`) lives in a separate persisted
+  `useConfigStore` (`zustand/middleware`'s `persist`, key `hl-term-config`), not the
+  main `useAppStore` — deliberate: live market data (candles, WS status, AI cache)
+  is per-session and should reset on reload, but preferences shouldn't. Verified for
+  real: set lookback to 300 via the palette, confirmed the exact JSON landed in
+  `localStorage`, then reloaded the page and confirmed it came back as "current" in
+  the palette (not just that a write happened — that a fresh page load rehydrates
+  from it).
+- **Background pre-compute is REST-poll-based (every 45s), not a live WS subscription
+  per watchlist coin.** Deliberate given what Phase 4 already showed: the currently
+  configured free model (`google/gemma-4-31b-it:free`) rate-limits at 16k
+  tokens/minute, and a background read is a full `/api/read` context (200 candles +
+  indicators) — 5–6 live WS subscriptions all bar-closing near-simultaneously (e.g.
+  the top of the hour) would fire that many LLM calls at once and blow through the
+  quota immediately. Background reads that do fire are staggered 5s apart
+  (`useWatchlist.ts`) for the same reason. A live-WS-per-coin design would be more
+  "live" but is the wrong tradeoff against this rate limit; reconsider if/when the
+  model changes.
+- Background reads reuse the same `aiReadCache`/`runRead` path as the active coin
+  (`triggerReadFor`, extracted from `triggerRead` in this phase) — switching to a
+  watchlist coin whose bar already closed in the background shows an instant cached
+  read, same as switching back to a coin you were already viewing.
+- Read log caps at 200 entries (oldest dropped) to bound memory over a long session;
+  kept in-memory only (not persisted) since its purpose is "download and inspect
+  externally," not "survive a reload."
+- **Verified in a real browser with the full stack running:** watchlist row shows
+  all 6 coins with live-polled prices and bias coloring (confirmed one coin actually
+  rendered green from a real `long` bias, not just neutral/amber everywhere);
+  pressing "3" jumped the whole app to the 3rd watchlist coin — TopBar, chart,
+  indicators, WS status ("connecting" → new subscription), and a fresh AI read all
+  updated correctly, matching the same re-snapshot/re-subscribe/repaint behavior
+  already verified for palette-driven switches in Phase 3. Palette's new Actions
+  (watchlist toggle, set default interval, lookback presets, download log) all
+  render and reflect real state (e.g. "Download read log (1)" matched the actual
+  log count).
 
 ---
 

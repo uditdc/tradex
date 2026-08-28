@@ -40,3 +40,14 @@ export interface AskState {
   question: string
   error?: string
 }
+
+/** One entry in the session's downloadable read/ask log. */
+export interface LogEntry {
+  timestamp: number
+  coin: string
+  interval: string
+  kind: 'read' | 'ask'
+  question?: string
+  text: string
+  parsed: AiRead | null
+}
