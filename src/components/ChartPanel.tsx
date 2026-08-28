@@ -1,4 +1,11 @@
-import { CandlestickSeries, type ISeriesApi, type UTCTimestamp, createChart } from 'lightweight-charts'
+import {
+  CandlestickSeries,
+  type IPriceLine,
+  type ISeriesApi,
+  LineStyle,
+  type UTCTimestamp,
+  createChart,
+} from 'lightweight-charts'
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../store'
 import type { Candle } from '../lib/hl/types'
@@ -17,7 +24,9 @@ export function ChartPanel() {
   const containerRef = useRef<HTMLDivElement>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const prevLengthRef = useRef(0)
+  const priceLinesRef = useRef<IPriceLine[]>([])
   const candles = useAppStore((s) => s.candles)
+  const keyLevels = useAppStore((s) => s.aiReadCache[`${s.coin}:${s.interval}`]?.parsed?.key_levels ?? null)
 
   useEffect(() => {
     const container = containerRef.current
@@ -71,6 +80,22 @@ export function ChartPanel() {
     }
     prevLengthRef.current = candles.length
   }, [candles])
+
+  useEffect(() => {
+    const series = seriesRef.current
+    if (!series) return
+
+    for (const line of priceLinesRef.current) series.removePriceLine(line)
+    priceLinesRef.current = (keyLevels ?? []).map((level) =>
+      series.createPriceLine({
+        price: level.price,
+        color: '#E8B45A',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        title: `${level.kind}${level.note ? ` — ${level.note}` : ''}`,
+      }),
+    )
+  }, [keyLevels])
 
   return <div ref={containerRef} className="h-full w-full" />
 }

@@ -1,4 +1,4 @@
-import type { Candle, RawCandle } from './types'
+import type { BookLevel, Candle, RawBookLevel, RawCandle } from './types'
 
 export function rawCandleToCandle(raw: RawCandle): Candle {
   return {
@@ -13,4 +13,8 @@ export function rawCandleToCandle(raw: RawCandle): Candle {
     volume: Number(raw.v),
     trades: raw.n,
   }
+}
+
+export function rawBookLevelToBookLevel(raw: RawBookLevel): BookLevel {
+  return { price: Number(raw.px), size: Number(raw.sz) }
 }

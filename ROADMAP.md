@@ -178,18 +178,69 @@ Notes:
 ---
 
 ## Phase 4 — AI read
-- [ ] `server/index.ts` (Hono): `/api/read` and `/api/ask`, SSE streaming, key from env
-- [ ] Context builder per the CLAUDE.md contract; strict JSON parse, raw-text fallback
-- [ ] Triggers: coin/interval switch, bar close, palette action "read"
-- [ ] Read cache per `${coin}:${interval}`; switching back is zero latency
-- [ ] `/` opens the palette in ask mode; answer streams into AiPanel with the same
+- [x] `server/index.ts` (Hono): `/api/read` and `/api/ask`, SSE streaming, key from env
+- [x] Context builder per the CLAUDE.md contract; strict JSON parse, raw-text fallback
+- [x] Triggers: coin/interval switch, bar close, palette action "read"
+- [x] Read cache per `${coin}:${interval}`; switching back is zero latency
+- [x] `/` opens the palette in ask mode; answer streams into AiPanel with the same
       context attached
-- [ ] `key_levels` drawn on the chart as amber price lines with labels
+- [x] `key_levels` drawn on the chart as amber price lines with labels
 
 **Done when:** the read (or its cached version) is visible before you finish scanning
 the indicator block, and its levels sit on the chart.
 
 Notes:
+
+- **Provider discrepancy caught before writing any code:** CLAUDE.md said "Anthropic"
+  throughout, but `server/.env` (found untracked at repo root earlier — see Phase 2
+  notes) is actually configured for OpenRouter (`LLM_BASE_URL`) against a free Gemma
+  model (`LLM_MODEL=google/gemma-4-31b-it:free`), not Anthropic. Asked the user rather
+  than guessing; confirmed to build against what's actually configured. Updated
+  CLAUDE.md's wording from "Anthropic" to provider-neutral ("LLM"/"OpenAI-compatible")
+  to match reality — the server only assumes an OpenAI-style `/chat/completions`
+  streaming endpoint, so swapping models or providers later is a `.env` change.
+- `server/.env` moved from the repo root (where it was found) to `server/.env`, per
+  CLAUDE.md's convention. Still untracked/gitignored either way.
+- The AI read contract's "top-5 book levels" input needed a new REST call —
+  `l2Book` didn't exist yet. Added it to `src/lib/hl/rest.ts` after fetching and
+  inspecting a real response (`levels: [bids, asks]`, bids descending, asks
+  ascending) rather than guessing the shape.
+- SSE wire format between our server and the browser is our own, not OpenRouter's
+  passed through raw: each event's `data:` is a JSON-encoded token string
+  (`data: "some text"\n\n`), terminated by a literal `data: [DONE]\n\n`. JSON-encoding
+  each token avoids ambiguity if a token itself contains a real newline, which a
+  naive `\n\n`-delimited raw-text protocol would corrupt. The server parses
+  OpenRouter's own SSE (`choices[0].delta.content`) and re-emits in this format, so
+  swapping providers only touches `server/index.ts`, never the client parser.
+- **Verified against the real API, not mocked** — read the actual streamed
+  `/api/read` response for a realistic context, confirmed the model returns clean
+  JSON with no markdown fence around it (still handled the fence-stripping case in
+  `parseAiRead` regardless, since it's a known LLM habit), and confirmed the client's
+  SSE accumulation + strict parse round-trips it correctly.
+- **Verified in a real browser with the full stack running** (`pnpm dev`, both Vite
+  and the Hono server): the auto-triggered read on load rendered bias/confidence/
+  rationale/key-levels correctly in the AiPanel, and the two key_levels appeared as
+  dashed amber price lines on the chart with labels, at the exact prices the model
+  returned. Also verified `/` ask mode end-to-end: typed a question, got a real
+  streamed answer, and confirmed the ask panel and the cached read panel are
+  independent (an ask failure doesn't clobber the read cache, and vice versa).
+- Hit `google/gemma-4-31b-it:free`'s per-minute token quota (16,000
+  tokens/min on the free tier) partway through manual verification — a few
+  back-to-back real calls (curl tests + the auto-triggered read + an ask) was enough
+  to trip it. Confirmed the failure path renders correctly too (raw error text in
+  the panel, read cache untouched). This is a real operational constraint of the
+  currently-configured free model, not a bug — the full `/api/read` context (200
+  candles + indicators) is not small, so this model/tier will rate-limit quickly
+  under real use. Worth switching `LLM_MODEL` to a paid tier or a higher-limit model
+  before relying on this daily.
+- `pnpm dev` now runs two processes via `concurrently` (`dev:client` for Vite,
+  `dev:server` for `tsx watch --env-file=server/.env server/index.ts` on port 8787);
+  Vite proxies `/api/*` to it in dev. `tsx`'s `watch` subcommand must come before
+  other flags (`tsx watch --env-file=... file.ts`, not
+  `tsx --env-file=... watch file.ts`) — the latter treats `watch` as the entry file
+  and fails with `ERR_MODULE_NOT_FOUND`.
+- Found and fixed a shadcn/cmdk bug while verifying in-browser (see Phase 3 notes)
+  before this phase started, which is what made the palette usable for ask mode here.
 
 ---
 

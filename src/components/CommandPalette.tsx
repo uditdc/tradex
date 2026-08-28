@@ -9,6 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from './ui/command'
+import { triggerAsk, triggerRead } from '../hooks/useAiRead'
 import { INTERVAL_MS } from '../lib/hl/intervals'
 import { useAppStore } from '../store'
 
@@ -17,6 +18,8 @@ import { useAppStore } from '../store'
 const COINS = ['HYPE', 'BTC', 'ETH', 'SOL', 'XRP', 'DOGE']
 const INTERVALS = Object.keys(INTERVAL_MS)
 
+type Mode = 'command' | 'ask'
+
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false
   return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable
@@ -24,6 +27,8 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<Mode>('command')
+  const [askQuery, setAskQuery] = useState('')
   const coin = useAppStore((s) => s.coin)
   const interval = useAppStore((s) => s.interval)
   const setCoinInterval = useAppStore((s) => s.setCoinInterval)
@@ -32,6 +37,12 @@ export function CommandPalette() {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === ':' && !isTypingTarget(e.target)) {
         e.preventDefault()
+        setMode('command')
+        setOpen(true)
+      } else if (e.key === '/' && !isTypingTarget(e.target)) {
+        e.preventDefault()
+        setMode('ask')
+        setAskQuery('')
         setOpen(true)
       }
     }
@@ -44,12 +55,50 @@ export function CommandPalette() {
     setOpen(false)
   }
 
+  function runRead() {
+    setOpen(false)
+    void triggerRead()
+  }
+
+  function submitAsk() {
+    const question = askQuery.trim()
+    if (!question) return
+    setOpen(false)
+    void triggerAsk(question)
+  }
+
+  if (mode === 'ask') {
+    return (
+      <CommandDialog open={open} onOpenChange={setOpen} title="Ask the AI" description="Ask a question about this market">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Ask about this market... (Enter to send)"
+            value={askQuery}
+            onValueChange={setAskQuery}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                submitAsk()
+              }
+            }}
+          />
+        </Command>
+      </CommandDialog>
+    )
+  }
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen} title="Command palette" description="Switch coin or interval">
       <Command>
-        <CommandInput placeholder="Jump to coin or interval..." />
+        <CommandInput placeholder="Jump to coin, interval, or action..." />
         <CommandList>
           <CommandEmpty>No match.</CommandEmpty>
+          <CommandGroup heading="Actions">
+            <CommandItem value="read" onSelect={runRead}>
+              Read current market
+            </CommandItem>
+          </CommandGroup>
+          <CommandSeparator />
           <CommandGroup heading="Coin">
             {COINS.map((c) => (
               <CommandItem key={c} value={c} onSelect={() => select(c, interval)}>

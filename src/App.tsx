@@ -4,6 +4,7 @@ import { CommandPalette } from './components/CommandPalette'
 import { IndicatorBlock } from './components/IndicatorBlock'
 import { StatusLine } from './components/StatusLine'
 import { TopBar } from './components/TopBar'
+import { useAiRead } from './hooks/useAiRead'
 import { useCandles } from './hooks/useCandles'
 import { useAppStore } from './store'
 
@@ -11,6 +12,7 @@ function App() {
   const coin = useAppStore((s) => s.coin)
   const interval = useAppStore((s) => s.interval)
   useCandles(coin, interval)
+  useAiRead()
 
   return (
     <div className="bg-term-bg flex h-screen w-screen flex-col overflow-hidden">

@@ -62,3 +62,27 @@ export interface RawAssetCtx {
 }
 
 export type RawMetaAndAssetCtxs = [{ universe: RawUniverseAsset[] }, RawAssetCtx[]]
+
+/** Raw shape of one price level as returned by the `l2Book` info request. */
+export interface RawBookLevel {
+  px: string
+  sz: string
+  n: number
+}
+
+/** `levels` is `[bids, asks]`: bids descending from best bid, asks ascending from best ask. */
+export interface RawL2Book {
+  coin: string
+  time: number
+  levels: [RawBookLevel[], RawBookLevel[]]
+}
+
+export interface BookLevel {
+  price: number
+  size: number
+}
+
+export interface OrderBook {
+  bids: BookLevel[]
+  asks: BookLevel[]
+}

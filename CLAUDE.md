@@ -21,10 +21,15 @@ happen elsewhere.
 - Tailwind + shadcn/ui (Command/cmdk for the command palette, Card, Badge, Table,
   Skeleton, Sonner for toasts)
 - `lightweight-charts` for the candle panel
-- Tiny Node backend (Hono) with two jobs only: stream Anthropic API responses
-  (`/api/read`, `/api/ask`) so the key stays server-side, and proxy Hyperliquid REST
-  if the browser hits CORS trouble. Try direct browser calls to the info endpoint
-  first; only add the proxy if actually needed.
+- Tiny Node backend (Hono) with two jobs only: stream LLM responses (`/api/read`,
+  `/api/ask`) so the key stays server-side, and proxy Hyperliquid REST if the browser
+  hits CORS trouble. Try direct browser calls to the info endpoint first; only add
+  the proxy if actually needed.
+- LLM provider is OpenAI-compatible (currently OpenRouter — see `server/.env`'s
+  `LLM_API_KEY`/`LLM_BASE_URL`/`LLM_MODEL`), not Anthropic-specific. Swapping models
+  or providers later is a `server/.env` change, not a code change, as long as the
+  provider speaks the OpenAI chat-completions shape (OpenRouter does, for any model
+  it hosts, Anthropic's included).
 - WebSocket to Hyperliquid straight from the browser
 - `vitest` for tests, indicators fully covered
 
@@ -92,5 +97,5 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
 - Every phase ends with: `vitest` green, typecheck clean, `ROADMAP.md` box ticked plus a
   two-line note on what actually got built and anything surprising.
 - Never invent Hyperliquid API fields — fetch a real response and inspect it.
-- The Anthropic key lives in `server/.env` only. It must never reach the client bundle.
+- The LLM API key lives in `server/.env` only. It must never reach the client bundle.
 - If a phase balloons, stop, split it in `ROADMAP.md`, and ask.

@@ -1,5 +1,5 @@
-import { rawCandleToCandle } from './mappers'
-import type { Candle, MarketCtx, RawCandle, RawMetaAndAssetCtxs } from './types'
+import { rawBookLevelToBookLevel, rawCandleToCandle } from './mappers'
+import type { Candle, MarketCtx, OrderBook, RawCandle, RawL2Book, RawMetaAndAssetCtxs } from './types'
 
 const INFO_URL = 'https://api.hyperliquid.xyz/info'
 
@@ -46,5 +46,14 @@ export async function metaAndAssetCtxs(coin: string): Promise<MarketCtx> {
     openInterest: Number(ctx.openInterest),
     prevDayPx: Number(ctx.prevDayPx),
     dayNtlVlm: Number(ctx.dayNtlVlm),
+  }
+}
+
+export async function l2Book(coin: string): Promise<OrderBook> {
+  const raw = await postInfo<RawL2Book>({ type: 'l2Book', coin })
+  const [bids, asks] = raw.levels
+  return {
+    bids: bids.map(rawBookLevelToBookLevel),
+    asks: asks.map(rawBookLevelToBookLevel),
   }
 }

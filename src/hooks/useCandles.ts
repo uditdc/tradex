@@ -16,6 +16,7 @@ export function useCandles(coin: string, interval: string): void {
   const setWsStatus = useAppStore((s) => s.setWsStatus)
   const setLastUpdate = useAppStore((s) => s.setLastUpdate)
   const setLatencyMs = useAppStore((s) => s.setLatencyMs)
+  const setLastBarCloseAt = useAppStore((s) => s.setLastBarCloseAt)
 
   useEffect(() => {
     let cancelled = false
@@ -42,9 +43,10 @@ export function useCandles(coin: string, interval: string): void {
         onStatus: setWsStatus,
         onLatency: setLatencyMs,
         onCandle: (candle) => {
-          buffer.push(candle)
+          const closed = buffer.push(candle)
           setCandles(buffer.all)
           setLastUpdate(Date.now())
+          if (closed) setLastBarCloseAt(Date.now())
         },
       })
     }
@@ -57,5 +59,5 @@ export function useCandles(coin: string, interval: string): void {
       cancelled = true
       subscription?.close()
     }
-  }, [coin, interval, setCandles, setMarketCtx, setWsStatus, setLastUpdate, setLatencyMs])
+  }, [coin, interval, setCandles, setMarketCtx, setWsStatus, setLastUpdate, setLatencyMs, setLastBarCloseAt])
 }

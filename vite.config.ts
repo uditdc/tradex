@@ -11,6 +11,11 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8787',
+    },
+  },
   test: {
     environment: 'jsdom',
   },

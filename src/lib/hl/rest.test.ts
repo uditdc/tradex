@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { candleSnapshot, metaAndAssetCtxs } from './rest'
+import { candleSnapshot, l2Book, metaAndAssetCtxs } from './rest'
 
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -84,5 +84,41 @@ describe('metaAndAssetCtxs', () => {
   it('throws on an unknown coin', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(rawMeta)))
     await expect(metaAndAssetCtxs('NOPE')).rejects.toThrow('Unknown coin: NOPE')
+  })
+})
+
+describe('l2Book', () => {
+  // Modeled on a real l2Book response for HYPE: levels[0] is bids (descending from
+  // best bid), levels[1] is asks (ascending from best ask).
+  const rawBook = {
+    coin: 'HYPE',
+    time: 1787917808854,
+    levels: [
+      [
+        { px: '83.086', sz: '21.99', n: 1 },
+        { px: '83.085', sz: '26.8', n: 2 },
+      ],
+      [
+        { px: '83.087', sz: '17.3', n: 1 },
+        { px: '83.088', sz: '101.14', n: 2 },
+      ],
+    ],
+  }
+
+  it('maps levels into typed bids/asks', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(rawBook)))
+
+    const book = await l2Book('HYPE')
+
+    expect(book).toEqual({
+      bids: [
+        { price: 83.086, size: 21.99 },
+        { price: 83.085, size: 26.8 },
+      ],
+      asks: [
+        { price: 83.087, size: 17.3 },
+        { price: 83.088, size: 101.14 },
+      ],
+    })
   })
 })
