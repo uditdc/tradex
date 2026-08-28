@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Secrets — the Anthropic/LLM key must never be committed (CLAUDE.md: server/.env only)
+.env
+.env.*
+server/.env
+server/.env.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

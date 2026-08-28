@@ -76,15 +76,44 @@ Notes:
 ---
 
 ## Phase 2 — Live feed
-- [ ] `src/lib/hl/ws.ts`: candle-channel subscription; reconnect with backoff
-- [ ] Candle buffer that merges the live bar into the snapshot correctly (update open
+- [x] `src/lib/hl/ws.ts`: candle-channel subscription; reconnect with backoff
+- [x] Candle buffer that merges the live bar into the snapshot correctly (update open
       bar, append on close, never duplicate) — unit-tested with synthetic messages
-- [ ] `scripts/tail.ts`: `pnpm tail HYPE 1m` logs price + indicators per tick and a
+- [x] `scripts/tail.ts`: `pnpm tail HYPE 1m` logs price + indicators per tick and a
       CLOSED line per bar
 
 **Done when:** 15 minutes of `tail` on 1m yields exactly the right bar count.
 
 Notes:
+
+- Verified for real: ran `pnpm tail HYPE 1m` in the background for 16 minutes.
+  Result: exactly 16 `CLOSED` lines, timestamps `11:17:00` through `11:32:00.000Z`
+  with no gaps and no repeats, one WS connection the whole time (no reconnects
+  needed). This is the actual live run, not an inference from the unit tests.
+- WS message shapes were captured from the real socket first (not invented):
+  `{"channel":"subscriptionResponse",...}` on subscribe ack, then
+  `{"channel":"candle","data":<RawCandle>}` repeated with the same `t`/`T` while a
+  bar is open, advancing to a new `t` once it closes — that's what the merge logic
+  in `buffer.ts` keys off (same `openTime` → replace in place; greater → append and
+  report the previous bar closed; lesser/stale → drop).
+  `rawCandleToCandle` moved out of `rest.ts` into `hl/mappers.ts` so `ws.ts` doesn't
+  need to import from `rest.ts`.
+- `subscribeCandles` takes an injectable `WebSocketImpl` (defaults to the global
+  `WebSocket`, which exists in both the browser and Node 22+, so no `ws` package
+  needed) — that's what makes the reconnect/backoff logic unit-testable with a fake
+  socket instead of a live connection.
+- Reconnect backoff: starts at 500ms, doubles each consecutive drop, caps at 30s,
+  resets to 500ms after a successful reopen. Not exercised by the live 16-minute run
+  since the connection never dropped — only verified via the fake-socket unit tests.
+  Worth watching the first time a real disconnect happens once Phase 3 has this
+  running in a browser tab all day.
+- `INTERVAL_MS` (probe.ts's interval → ms lookup) moved to `src/lib/hl/intervals.ts`
+  so `probe.ts` and `tail.ts` share it instead of duplicating.
+- Found and fixed a real gap while testing this: `.env` (LLM key) existed at the repo
+  root, untracked but **not** in `.gitignore` — one `git add -A` would have staged
+  it. Added `.env`/`server/.env` patterns to `.gitignore`. The key itself currently
+  sits at repo root as generic `LLM_API_KEY`/`LLM_BASE_URL`/`LLM_MODEL`, not yet in
+  `server/.env` as CLAUDE.md specifies — move it there when Phase 4 creates `server/`.
 
 ---
 

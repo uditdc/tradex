@@ -1,3 +1,4 @@
+import { rawCandleToCandle } from './mappers'
 import type { Candle, MarketCtx, RawCandle, RawMetaAndAssetCtxs } from './types'
 
 const INFO_URL = 'https://api.hyperliquid.xyz/info'
@@ -14,21 +15,6 @@ async function postInfo<T>(body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
-function toCandle(raw: RawCandle): Candle {
-  return {
-    openTime: raw.t,
-    closeTime: raw.T,
-    symbol: raw.s,
-    interval: raw.i,
-    open: Number(raw.o),
-    high: Number(raw.h),
-    low: Number(raw.l),
-    close: Number(raw.c),
-    volume: Number(raw.v),
-    trades: raw.n,
-  }
-}
-
 export async function candleSnapshot(
   coin: string,
   interval: string,
@@ -39,7 +25,7 @@ export async function candleSnapshot(
     type: 'candleSnapshot',
     req: { coin, interval, startTime, endTime },
   })
-  return raw.map(toCandle)
+  return raw.map(rawCandleToCandle)
 }
 
 export async function metaAndAssetCtxs(coin: string): Promise<MarketCtx> {

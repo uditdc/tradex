@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
-    "probe": "tsx scripts/probe.ts"
+    "probe": "tsx scripts/probe.ts",
+    "tail": "tsx scripts/tail.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
