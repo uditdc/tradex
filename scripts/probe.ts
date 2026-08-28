@@ -1,6 +1,6 @@
 import { computeAll } from '../src/lib/indicators'
 import { candleSnapshot, metaAndAssetCtxs } from '../src/lib/hl/rest'
-import { intervalMs } from '../src/lib/hl/intervals'
+import { DEFAULT_CANDLE_LOOKBACK, intervalMs } from '../src/lib/hl/intervals'
 
 const [coin, interval] = process.argv.slice(2)
 if (!coin || !interval) {
@@ -8,14 +8,11 @@ if (!coin || !interval) {
   process.exit(1)
 }
 
-// computeAll needs at least 55 bars for EMA55; pull a comfortable buffer beyond that.
-const CANDLE_LOOKBACK = 210
-
 async function main() {
   const ms = intervalMs(interval)
 
   const [candles, ctx] = await Promise.all([
-    candleSnapshot(coin, interval, Date.now() - CANDLE_LOOKBACK * ms, Date.now()),
+    candleSnapshot(coin, interval, Date.now() - DEFAULT_CANDLE_LOOKBACK * ms, Date.now()),
     metaAndAssetCtxs(coin),
   ])
 

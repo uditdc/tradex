@@ -150,6 +150,43 @@ describe('subscribeCandles', () => {
     expect(FakeWebSocket.instances).toHaveLength(3)
   })
 
+  it('pings on an interval and reports round-trip latency on pong', () => {
+    const onLatency = vi.fn()
+    subscribeCandles('HYPE', '1m', {
+      onCandle: vi.fn(),
+      onLatency,
+      WebSocketImpl: FakeWebSocket as unknown as typeof WebSocket,
+      pingIntervalMs: 1_000,
+    })
+
+    const socket = FakeWebSocket.instances[0]
+    socket.emitOpen()
+
+    vi.advanceTimersByTime(1_000)
+    expect(JSON.parse(socket.sent.at(-1)!)).toEqual({ method: 'ping' })
+
+    vi.advanceTimersByTime(42)
+    socket.emitMessage({ channel: 'pong' })
+
+    expect(onLatency).toHaveBeenCalledWith(42)
+  })
+
+  it('stops pinging once the subscription is closed', () => {
+    const subscription = subscribeCandles('HYPE', '1m', {
+      onCandle: vi.fn(),
+      WebSocketImpl: FakeWebSocket as unknown as typeof WebSocket,
+      pingIntervalMs: 1_000,
+    })
+
+    const socket = FakeWebSocket.instances[0]
+    socket.emitOpen()
+    subscription.close()
+
+    const sentBeforeWait = socket.sent.length
+    vi.advanceTimersByTime(10_000)
+    expect(socket.sent.length).toBe(sentBeforeWait)
+  })
+
   it('does not reconnect after the caller explicitly closes the subscription', () => {
     const subscription = subscribeCandles('HYPE', '1m', {
       onCandle: vi.fn(),

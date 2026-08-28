@@ -1,8 +1,8 @@
 import { CandleBuffer } from '../src/lib/hl/buffer'
-import { intervalMs } from '../src/lib/hl/intervals'
+import { DEFAULT_CANDLE_LOOKBACK, intervalMs } from '../src/lib/hl/intervals'
 import { candleSnapshot } from '../src/lib/hl/rest'
 import { subscribeCandles } from '../src/lib/hl/ws'
-import { computeAll } from '../src/lib/indicators'
+import { MIN_CANDLES, computeAll } from '../src/lib/indicators'
 import type { Candle } from '../src/lib/hl/types'
 
 const [coin, interval] = process.argv.slice(2)
@@ -11,14 +11,10 @@ if (!coin || !interval) {
   process.exit(1)
 }
 
-// computeAll needs at least 55 bars for EMA55; pull a comfortable buffer beyond that.
-const CANDLE_LOOKBACK = 210
-const MIN_CANDLES_FOR_INDICATORS = 55
-
 function logTick(candle: Candle, buffer: CandleBuffer) {
   const time = new Date(candle.openTime).toISOString()
-  if (buffer.all.length < MIN_CANDLES_FOR_INDICATORS) {
-    console.log(`${time}  price ${candle.close}  (warming up: ${buffer.all.length}/${MIN_CANDLES_FOR_INDICATORS})`)
+  if (buffer.all.length < MIN_CANDLES) {
+    console.log(`${time}  price ${candle.close}  (warming up: ${buffer.all.length}/${MIN_CANDLES})`)
     return
   }
   const dict = computeAll(buffer.all)
@@ -29,7 +25,7 @@ function logTick(candle: Candle, buffer: CandleBuffer) {
 
 async function main() {
   const ms = intervalMs(interval)
-  const snapshot = await candleSnapshot(coin, interval, Date.now() - CANDLE_LOOKBACK * ms, Date.now())
+  const snapshot = await candleSnapshot(coin, interval, Date.now() - DEFAULT_CANDLE_LOOKBACK * ms, Date.now())
   const buffer = new CandleBuffer(snapshot)
 
   console.log(`${coin} ${interval} — bootstrapped with ${snapshot.length} candles, tailing live...`)

@@ -118,20 +118,62 @@ Notes:
 ---
 
 ## Phase 3 — Terminal shell
-- [ ] Theme tokens from CLAUDE.md set up in Tailwind/shadcn css variables
-- [ ] Fixed-grid layout: TopBar (coin, interval, price, 24h %, funding, OI),
+- [x] Theme tokens from CLAUDE.md set up in Tailwind/shadcn css variables
+- [x] Fixed-grid layout: TopBar (coin, interval, price, 24h %, funding, OI),
       IndicatorBlock (colour-coded, ticking), ChartPanel with `lightweight-charts`
       candles bound to the live buffer, empty AiPanel, bottom status line
       (WS state, latency, last update)
-- [ ] Command palette: `:` → coins/intervals/actions; switching re-snapshots,
+- [x] Command palette: `:` → coins/intervals/actions; switching re-snapshots,
       re-subscribes, repaints with no freeze; `q` does nothing (this is a browser —
       but Esc closes the palette)
-- [ ] Value-change flash on price and indicator cells
+- [x] Value-change flash on price and indicator cells
 
 **Done when:** it reads like a terminal pane you'd keep open all day, and coin/interval
 switches feel instant.
 
 Notes:
+
+- Verified in a real headless browser (Playwright, driven from a throwaway script —
+  `chromium-cli` wasn't available in this environment), not just by reading the code:
+  screenshotted the main layout, opened the palette with `:`, closed it with `Esc`.
+  Screenshots show live WS data ticking, correct green/red candles, and amber
+  value-change flashes mid-animation. See git history for the screenshots if needed;
+  not committed to the repo.
+- Found and fixed a real bug this way: `CommandDialog` (shadcn's wrapper) does **not**
+  itself provide cmdk's store context — I'd nested `CommandInput`/`CommandList`/
+  `CommandItem` directly inside it, which threw `Cannot read properties of undefined
+  (reading 'subscribe')` the moment the dialog opened. Fix: wrap the contents in
+  `<Command>` (cmdk's own root) inside `CommandDialog`. This would not have been
+  caught by typecheck or vitest — only by actually opening the palette in a browser.
+- shadcn's `add` CLI hit the same `./@/` stray-folder bug as Phase 0's `init` (see
+  that phase's notes) — moved `card.tsx`/`command.tsx`/etc. into `src/components/ui`
+  by hand again, skipping the duplicate `button.tsx`.
+- lightweight-charts v5 changed its series API from `chart.addCandlestickSeries()` to
+  `chart.addSeries(CandlestickSeries, options)` — checked the installed package's
+  `.d.ts` directly rather than assuming the v4 API most training data would suggest.
+- Added a real ping/pong heartbeat to `ws.ts` (`{"method":"ping"}` →
+  `{"channel":"pong"}`, confirmed against the live socket, sent every 15s) so the
+  status line's "latency" field is an actual measured RTT, not a placeholder — this
+  wasn't in Phase 2's scope but the status line needed it, so it went into `ws.ts`
+  alongside the existing candle-subscribe logic. Covered by new unit tests in
+  `ws.test.ts`, not by the live 16-minute Phase 2 run (which predates this).
+  The store's `WsState` type is `ws.ts`'s `ConnectionStatus` plus an added `'idle'`
+  member for "not subscribed yet".
+- Known simplification: CLAUDE.md's indicator block lists "OI + OI change over
+  lookback"; only current OI is shown. OI change would need historical OI tracking,
+  which nothing persists yet — didn't want to invent a half-built history mechanism
+  for one field. Worth a real look if OI momentum turns out to matter.
+- Command palette's coin list is a hardcoded set of six (HYPE, BTC, ETH, SOL, XRP,
+  DOGE), not the full ~200-asset Hyperliquid universe (which `metaAndAssetCtxs`
+  already fetches, just doesn't currently expose). Fine for now; Phase 5's
+  watchlist/config work is the natural place to make this real.
+- TopBar/IndicatorBlock's "price" is the latest candle close (ticks live via the
+  candle WS stream), not `marketCtx.markPx` — there's no separate live mark-price
+  subscription, only a one-time REST fetch on bootstrap. For the interval sizes this
+  app targets they track closely enough; flagging in case it ever looks off.
+- Font: JetBrains Mono Variable (self-hosted via `@fontsource-variable`, same pattern
+  shadcn's default Geist install used) mapped onto shadcn's `--font-sans` token rather
+  than introducing a separate mono utility, since CLAUDE.md wants it everywhere.
 
 ---
 

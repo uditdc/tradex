@@ -7,7 +7,7 @@ import { nearestSwingLevels } from './swing'
 import type { Bias, IndicatorDict } from './types'
 import { volumeRatio as computeVolumeRatio } from './volume'
 
-const MIN_CANDLES = 55
+export const MIN_CANDLES = 55
 const ATR_TREND_LOOKBACK = 50
 const SWING_LOOKBACK = 5
 

@@ -16,6 +16,9 @@ export const INTERVAL_MS: Record<string, number> = {
   '1M': 30 * 24 * 60 * 60_000,
 }
 
+/** Bars to backfill on a fresh snapshot; comfortably covers computeAll's 55-bar EMA55. */
+export const DEFAULT_CANDLE_LOOKBACK = 210
+
 export function intervalMs(interval: string): number {
   const ms = INTERVAL_MS[interval]
   if (!ms) {
