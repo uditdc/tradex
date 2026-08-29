@@ -16,28 +16,24 @@ function cacheKey(coin: string, interval: string): string {
 async function runRead(coin: string, interval: string, candles: Candle[], marketCtx: MarketCtx): Promise<AiRead | null> {
   const { setAiRead, addLogEntry } = useAppStore.getState()
   const key = cacheKey(coin, interval)
-  setAiRead(key, { status: 'streaming', text: '', parsed: null })
+  setAiRead(key, { status: 'loading', text: '', parsed: null })
 
   try {
     const indicators = computeAll(candles)
     const book = await l2Book(coin)
     const context = buildContext(coin, interval, candles, indicators, marketCtx, book)
 
-    let acc = ''
-    await requestRead(context, (token) => {
-      acc += token
-      setAiRead(key, { status: 'streaming', text: acc, parsed: null })
-    })
+    const text = await requestRead(context)
 
-    const parsed = parseAiRead(acc)
-    if (!parsed) console.error('AI read did not parse as strict JSON:', acc)
+    const parsed = parseAiRead(text)
+    if (!parsed) console.error('AI read did not parse as strict JSON:', text)
     setAiRead(key, {
       status: 'done',
-      text: acc,
+      text,
       parsed,
       error: parsed ? undefined : 'Model did not return strict JSON — showing raw text.',
     })
-    addLogEntry({ timestamp: Date.now(), coin, interval, kind: 'read', text: acc, parsed })
+    addLogEntry({ timestamp: Date.now(), coin, interval, kind: 'read', text, parsed })
     return parsed
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -70,20 +66,16 @@ export async function triggerAsk(question: string): Promise<void> {
   const { coin, interval, candles, marketCtx, setAskState, addLogEntry } = useAppStore.getState()
   if (candles.length < MIN_CANDLES || !marketCtx) return
 
-  setAskState({ status: 'streaming', text: '', question })
+  setAskState({ status: 'loading', text: '', question })
 
   try {
     const indicators = computeAll(candles)
     const book = await l2Book(coin)
     const context = buildContext(coin, interval, candles, indicators, marketCtx, book)
 
-    let acc = ''
-    await requestAsk(context, question, (token) => {
-      acc += token
-      setAskState({ status: 'streaming', text: acc, question })
-    })
-    setAskState({ status: 'done', text: acc, question })
-    addLogEntry({ timestamp: Date.now(), coin, interval, kind: 'ask', question, text: acc, parsed: null })
+    const text = await requestAsk(context, question)
+    setAskState({ status: 'done', text, question })
+    addLogEntry({ timestamp: Date.now(), coin, interval, kind: 'ask', question, text, parsed: null })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('AI ask failed:', err)

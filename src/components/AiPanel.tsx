@@ -4,10 +4,6 @@ import { useIndicators } from '../hooks/useIndicators'
 import { computePositionVerdict, livePriceForPosition, pnlForPosition, suggestionSideFromBias } from '../lib/sim'
 import type { Verdict } from '../lib/sim'
 
-function Cursor() {
-  return <span className="bg-term-amber ml-0.5 inline-block h-3 w-1.5 animate-pulse align-middle" />
-}
-
 function biasClass(bias: string): string {
   const lower = bias.toLowerCase()
   if (lower.includes('long')) return 'text-term-up'
@@ -81,11 +77,10 @@ export function AiPanel() {
           <p className="text-term-amber text-sm">{askState.question}</p>
           {askState.status === 'error' ? (
             <p className="text-term-down text-sm">{askState.error}</p>
+          ) : askState.status === 'loading' ? (
+            <p className="text-term-muted text-sm">Thinking...</p>
           ) : (
-            <p className="text-term-muted text-sm whitespace-pre-wrap">
-              {askState.text}
-              {askState.status === 'streaming' && <Cursor />}
-            </p>
+            <p className="text-term-muted text-sm whitespace-pre-wrap">{askState.text}</p>
           )}
         </div>
       )}
@@ -97,12 +92,7 @@ export function AiPanel() {
 
       {!read && <p className="text-term-muted text-sm">Waiting for enough candles...</p>}
 
-      {read && read.status === 'streaming' && !read.parsed && (
-        <p className="text-term-muted text-sm whitespace-pre-wrap">
-          {read.text || 'Thinking...'}
-          <Cursor />
-        </p>
-      )}
+      {read && read.status === 'loading' && <p className="text-term-muted text-sm">Thinking...</p>}
 
       {read && read.status === 'error' && <p className="text-term-down text-sm">{read.error}</p>}
 

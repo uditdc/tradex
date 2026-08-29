@@ -37,101 +37,44 @@ interface ChatMessage {
   content: string
 }
 
-const encoder = new TextEncoder()
-
-function sseEvent(token: string): Uint8Array {
-  return encoder.encode(`data: ${JSON.stringify(token)}\n\n`)
-}
-
-const SSE_DONE = encoder.encode('data: [DONE]\n\n')
-
-async function streamCompletion(messages: ChatMessage[]): Promise<Response> {
+async function requestCompletion(messages: ChatMessage[]): Promise<string> {
   const upstream = await fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${LLM_API_KEY}`,
     },
-    body: JSON.stringify({ model: LLM_MODEL, messages, stream: true }),
+    body: JSON.stringify({ model: LLM_MODEL, messages, stream: false }),
   })
 
-  if (!upstream.ok || !upstream.body) {
+  if (!upstream.ok) {
     const detail = await upstream.text().catch(() => upstream.statusText)
     console.error(`upstream LLM request failed: ${upstream.status} ${detail}`)
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(sseEvent(`[error] upstream request failed: ${upstream.status}`))
-        controller.enqueue(SSE_DONE)
-        controller.close()
-      },
-    })
-    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
+    return `[error] upstream request failed: ${upstream.status}`
   }
 
-  const upstreamBody = upstream.body
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      const reader = upstreamBody.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (!trimmed.startsWith('data:')) continue
-          const payload = trimmed.slice('data:'.length).trim()
-          if (payload === '[DONE]') continue
-
-          try {
-            const parsed = JSON.parse(payload)
-            const token = parsed.choices?.[0]?.delta?.content
-            if (typeof token === 'string' && token.length > 0) {
-              controller.enqueue(sseEvent(token))
-            }
-          } catch (err) {
-            console.error('malformed upstream SSE chunk', err, payload)
-          }
-        }
-      }
-
-      controller.enqueue(SSE_DONE)
-      controller.close()
-    },
-  })
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  })
+  const body = (await upstream.json()) as { choices?: [{ message?: { content?: string } }] }
+  return body.choices?.[0]?.message?.content ?? ''
 }
 
 const app = new Hono()
 
 app.post('/api/read', async (c) => {
   const context = await c.req.json()
-  return streamCompletion([
+  const text = await requestCompletion([
     { role: 'system', content: READ_SYSTEM_PROMPT },
     { role: 'user', content: JSON.stringify(context) },
   ])
+  return c.json({ text })
 })
 
 app.post('/api/ask', async (c) => {
   const { context, question } = await c.req.json()
-  return streamCompletion([
+  const text = await requestCompletion([
     { role: 'system', content: ASK_SYSTEM_PROMPT },
     { role: 'user', content: `Context:\n${JSON.stringify(context)}\n\nQuestion: ${question}` },
   ])
+  return c.json({ text })
 })
 
 const port = Number(process.env.PORT ?? 8787)

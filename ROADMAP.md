@@ -370,6 +370,112 @@ Notes:
 
 ---
 
+## Phase 7 — AI reads: drop streaming, show results at once
+- [x] `/api/read` and `/api/ask` switch from SSE token streaming to a single
+      non-streaming completion call (no reason to keep SSE plumbing once nothing
+      renders token-by-token)
+- [x] `useAiRead`/`AiPanel`/ask mode show a loading state, then the parsed result in
+      one shot — remove the streaming-accumulation logic and the streaming-text CSS
+
+**Done when:** a read or ask answer appears fully formed, no partial-token flicker,
+and `pnpm test`/`pnpm typecheck` are green.
+
+Notes:
+
+- `server/index.ts`: `streamCompletion` (SSE passthrough) replaced with
+  `requestCompletion`, one `stream: false` call to the LLM, returning
+  `{ text: string }` as plain JSON from `/api/read`/`/api/ask`. Upstream failures
+  still surface as an embedded `"[error] upstream request failed: N"` string in
+  `text` (same convention as before) rather than an HTTP error, so the client's
+  existing raw-text-fallback path handles it unchanged — verified live against the
+  real (rate-limited) OpenRouter endpoint.
+- `lib/ai/client.ts`: `requestRead`/`requestAsk` dropped their `onToken` callback
+  param, now just `fetch` + `res.json()` returning the full text. `client.test.ts`
+  rewritten off the SSE-chunking fixtures onto plain JSON responses.
+- `ReadState`/`AskState.status` renamed `'streaming' → 'loading'` (it's a
+  request-in-flight flag now, not a token-accumulation state). Removed
+  `AiPanel`'s `Cursor` component and the streaming-token render branches; loading
+  now just shows a static "Thinking..." string.
+- Verified in a real browser (Playwright): polled the AI panel every second after
+  triggering a read — it stays on "Thinking..." with no intermediate partial JSON,
+  then the fully parsed bias/key-levels/zones/invalidation appear in one frame.
+  `/` ask mode hit the same free-tier 429 rate limit documented in Phase 4/5's
+  notes; confirmed the error still renders correctly through the new non-streaming
+  path (no crash, same "[error] ..." fallback text).
+
+---
+
+## Phase 8 — Local storage layer: AI read history per coin
+- [ ] New `lib/storage` (IndexedDB) storing AI reads per `${coin}:${interval}`,
+      keyed by timestamp, with a capped history length per key
+- [ ] Coin/interval switch shows the latest stored read instantly instead of
+      re-triggering generation; generation still fires on bar-close, manual
+      palette action, or when no stored read exists yet
+- [ ] CLAUDE.md's "no databases" non-goal gets a one-line carve-out: client-side
+      IndexedDB for local read/trade history is not the disallowed server database
+
+**Done when:** reloading the page or switching coins back and forth shows prior
+reads without re-generating, and history survives a reload.
+
+Notes:
+
+---
+
+## Phase 9 — Persist paper trades across sessions
+- [ ] Move `positions` out of session-only `useAppStore` into the Phase 8 storage
+      layer, keyed per coin — same local-only DB, still no real order path
+
+**Done when:** open paper positions survive a page reload.
+
+Notes:
+
+---
+
+## Phase 10 — Proper perp paper-trading mechanics
+- [ ] `SimPosition` gains optional `stopLoss`/`takeProfit`, settable at open (and
+      editable after)
+- [ ] Auto-close when live price crosses SL or TP, for coins with live data (active
+      coin or watchlist — same constraint as today's PnL/verdict availability)
+- [ ] Every close (manual or SL/TP-triggered) books realized PnL to a running ledger
+      (needed by Phase 11)
+- [ ] `lib/sim.ts` SL/TP direction logic (long vs. short) is pure and unit-tested
+
+**Done when:** a position with SL/TP set auto-closes correctly when price crosses
+either level, and the realized-PnL ledger reflects it.
+
+Notes:
+
+---
+
+## Phase 11 — Global paper portfolio
+- [ ] Global paper account: starting balance $10,000, realized-PnL ledger (Phase 10),
+      unrealized PnL from open positions with live data, equity, returns %
+- [ ] New UI surface for it (not in the mockup — placement is a real design decision:
+      dedicated panel vs. a StatusLine strip; decide when building this phase)
+
+**Done when:** opening/closing paper trades across multiple coins visibly moves a
+single portfolio equity/returns number, and it survives a reload.
+
+Notes:
+
+---
+
+## Phase 12 (Big) — AI reads become position-aware
+- [ ] Context builder feeds the model, when relevant for the coin: current open
+      paper position(s) (side, entry, size, SL/TP, live PnL) and the AI's own last
+      stored trade suggestion for that coin (from Phase 8's history)
+- [ ] AI read contract gains `position_guidance: { action: 'keep' | 'close' |
+      'adjust', note: string }`, present only when a position or prior suggestion
+      exists for the coin; parsed leniently like `zones` (undefined is valid)
+- [ ] `AiPanel` renders `position_guidance` against the relevant open position(s)
+
+**Done when:** re-running a read on a coin with an open paper position produces an
+explicit keep/close/adjust call referencing that position, not a generic read.
+
+Notes:
+
+---
+
 ## Parking lot (ideas, not commitments)
 - Alerts: price crosses an AI level, funding flip, RSI extreme → Sonner toast + sound
 - Fast model for auto-reads, stronger model for `/` questions

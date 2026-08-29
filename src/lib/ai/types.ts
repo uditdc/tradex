@@ -36,14 +36,14 @@ export interface AiRead {
 }
 
 export interface ReadState {
-  status: 'streaming' | 'done' | 'error'
+  status: 'loading' | 'done' | 'error'
   text: string
   parsed: AiRead | null
   error?: string
 }
 
 export interface AskState {
-  status: 'streaming' | 'done' | 'error'
+  status: 'loading' | 'done' | 'error'
   text: string
   question: string
   error?: string
