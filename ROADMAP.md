@@ -462,12 +462,48 @@ Notes:
 ---
 
 ## Phase 9 — Persist paper trades across sessions
-- [ ] Move `positions` out of session-only `useAppStore` into the Phase 8 storage
+- [x] Move `positions` out of session-only `useAppStore` into the Phase 8 storage
       layer, keyed per coin — same local-only DB, still no real order path
 
 **Done when:** open paper positions survive a page reload.
 
 Notes:
+
+- `lib/storage/positions.ts`: `savePosition`/`deletePosition`/`loadPositions` on a
+  new `positions` object store (`db.ts` bumped `DB_VERSION` 1 → 2; IndexedDB's
+  `onupgradeneeded` runs the same idempotent `upgrade()` for both a fresh DB and an
+  existing v1 DB, so Phase 8's `reads` store is untouched). `SimPosition` moved here
+  from `store/index.ts` (which now imports and re-exports the type) since the store
+  needs to call into `lib/storage` for I/O and a type living in the file that
+  imports it would be circular.
+- Positions are keyed by `id`, `readwrite`/`put` on open, `delete` on close — no
+  separate "coin" index was needed since there's no query pattern that looks up
+  positions by coin (the panel always operates on the full in-memory list).
+- **Id generation changed:** the old module-level `nextPositionId` counter
+  (`let nextPositionId = 1`) reset to 1 on every reload, which would have collided
+  with previously-persisted higher ids and overwritten them. Replaced with
+  `Date.now()` (same call reused for both `id` and `openedAt`) — monotonic across
+  reloads, and a same-millisecond collision from a single human clicking a button
+  isn't a real risk at this app's scale.
+- `store/index.ts`'s `openPosition`/`closePosition` now write through to storage
+  (`void savePosition(...)` / `void deletePosition(...)`, fire-and-forget) alongside
+  the existing synchronous zustand state update — same pattern `useAiRead.ts`
+  already used for reads in Phase 8, I/O triggered from the action/hook layer, not
+  from `lib/`. New `hydratePositions` action + `usePersistedPositions` hook
+  (mounted once in `App.tsx`, loads from IndexedDB on startup and calls
+  `hydratePositions`, sorted newest-first to match `openPosition`'s existing
+  prepend order) is how a reload gets positions back into the live store.
+- Tested `lib/storage/positions.ts` directly with `fake-indexeddb`, same pattern as
+  Phase 8's `reads.test.ts`. Didn't add a separate store-level test for the
+  write-through wiring — it's thin enough (one `void save/delete` call per action)
+  that the real-browser verification below is the meaningful check.
+- **Verified in a real browser** (Playwright): clicked "OPEN (PAPER)" on a real AI
+  trade suggestion, confirmed the position appeared in the panel and in IndexedDB
+  (`positions` store count 0→1), reloaded the page and confirmed both the panel
+  ("POSITIONS (1)") and the DB count still showed it — not just that a write
+  happened, that a fresh load rehydrates from it, same bar Phase 5 set for config
+  persistence. Then closed it and confirmed the DB count went back to 0 and stayed
+  at 0 across a second reload, so close doesn't leave an orphaned record behind.
 
 ---
 

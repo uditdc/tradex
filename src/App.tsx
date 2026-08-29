@@ -6,6 +6,7 @@ import { TopBar } from './components/TopBar'
 import { Watchlist } from './components/Watchlist'
 import { useAiRead } from './hooks/useAiRead'
 import { useCandles } from './hooks/useCandles'
+import { usePersistedPositions } from './hooks/usePersistedPositions'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useAppStore } from './store'
 
@@ -15,6 +16,7 @@ function App() {
   useCandles(coin, interval)
   useAiRead()
   useWatchlist()
+  usePersistedPositions()
 
   return (
     <div className="bg-term-bg flex h-screen w-screen flex-col overflow-hidden">

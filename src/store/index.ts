@@ -3,8 +3,11 @@ import type { AskState, LogEntry, ReadState } from '../lib/ai/types'
 import type { Candle, MarketCtx } from '../lib/hl/types'
 import type { ConnectionStatus } from '../lib/hl/ws'
 import type { Bias, Regime } from '../lib/indicators/types'
+import { deletePosition, savePosition } from '../lib/storage/positions'
+import type { SimPosition } from '../lib/storage/positions'
 
 export type WsState = ConnectionStatus | 'idle'
+export type { SimPosition }
 
 const MAX_LOG_ENTRIES = 200
 
@@ -15,24 +18,6 @@ export interface WatchlistEntry {
   /** openTime of the latest candle seen for this coin; used to detect a new bar close. */
   lastOpenTime: number
 }
-
-/**
- * A hypothetical, local-only position opened from the AI trade suggestion panel.
- * Purely a paper-trading tracker against live prices — no order is ever placed
- * (see CLAUDE.md non-goals: no execution, no wallet, no keys).
- */
-export interface SimPosition {
-  id: number
-  coin: string
-  interval: string
-  side: 'long' | 'short'
-  sizeUsd: number
-  leverage: number
-  entryPrice: number
-  openedAt: number
-}
-
-let nextPositionId = 1
 
 interface AppStore {
   coin: string
@@ -73,6 +58,8 @@ interface AppStore {
 
   openPosition: (input: Omit<SimPosition, 'id' | 'openedAt'>) => void
   closePosition: (id: number) => void
+  /** Replaces the in-memory position list with what's in durable storage; called once on startup. */
+  hydratePositions: (positions: SimPosition[]) => void
   setSimSizeUsd: (sizeUsd: number) => void
   setSimLeverage: (leverage: number) => void
 }
@@ -107,10 +94,18 @@ export const useAppStore = create<AppStore>((set) => ({
   setWatchlistEntry: (coin, entry) => set((s) => ({ watchlistData: { ...s.watchlistData, [coin]: entry } })),
 
   openPosition: (input) =>
-    set((s) => ({
-      positions: [{ ...input, id: nextPositionId++, openedAt: Date.now() }, ...s.positions],
-    })),
-  closePosition: (id) => set((s) => ({ positions: s.positions.filter((p) => p.id !== id) })),
+    set((s) => {
+      const openedAt = Date.now()
+      const position: SimPosition = { ...input, id: openedAt, openedAt }
+      void savePosition(position)
+      return { positions: [position, ...s.positions] }
+    }),
+  closePosition: (id) =>
+    set((s) => {
+      void deletePosition(id)
+      return { positions: s.positions.filter((p) => p.id !== id) }
+    }),
+  hydratePositions: (positions) => set({ positions }),
   setSimSizeUsd: (simSizeUsd) => set({ simSizeUsd }),
   setSimLeverage: (simLeverage) => set({ simLeverage }),
 }))

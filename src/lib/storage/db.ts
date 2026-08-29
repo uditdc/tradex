@@ -1,12 +1,16 @@
 const DB_NAME = 'hl-term'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 export const READS_STORE = 'reads'
+export const POSITIONS_STORE = 'positions'
 
 function upgrade(db: IDBDatabase): void {
   if (!db.objectStoreNames.contains(READS_STORE)) {
     const store = db.createObjectStore(READS_STORE, { keyPath: 'id', autoIncrement: true })
     store.createIndex('key', 'key', { unique: false })
+  }
+  if (!db.objectStoreNames.contains(POSITIONS_STORE)) {
+    db.createObjectStore(POSITIONS_STORE, { keyPath: 'id' })
   }
 }
 
