@@ -6,6 +6,7 @@ import { TopBar } from './components/TopBar'
 import { Watchlist } from './components/Watchlist'
 import { useAiRead } from './hooks/useAiRead'
 import { useCandles } from './hooks/useCandles'
+import { usePersistedLedger } from './hooks/usePersistedLedger'
 import { usePersistedPositions } from './hooks/usePersistedPositions'
 import { usePositionMonitor } from './hooks/usePositionMonitor'
 import { useWatchlist } from './hooks/useWatchlist'
@@ -18,6 +19,7 @@ function App() {
   useAiRead()
   useWatchlist()
   usePersistedPositions()
+  usePersistedLedger()
   usePositionMonitor()
 
   return (

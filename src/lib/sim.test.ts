@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { checkSlTp, computePositionVerdict, livePriceForPosition, pnlForPosition, suggestionSideFromBias } from './sim'
+import {
+  checkSlTp,
+  computePortfolio,
+  computePositionVerdict,
+  livePriceForPosition,
+  pnlForPosition,
+  suggestionSideFromBias,
+} from './sim'
 
 describe('livePriceForPosition', () => {
   it('uses the active price when the position is on the active coin', () => {
@@ -83,5 +90,21 @@ describe('checkSlTp', () => {
     expect(checkSlTp({ side: 'long', stopLoss: 90 }, 85)).toBe('stop_loss')
     expect(checkSlTp({ side: 'long', stopLoss: 90 }, 200)).toBeNull()
     expect(checkSlTp({ side: 'long', takeProfit: 110 }, 110)).toBe('take_profit')
+  })
+})
+
+describe('computePortfolio', () => {
+  it('equals the starting balance with no realized or unrealized PnL', () => {
+    expect(computePortfolio(0, 0, 10_000)).toEqual({ equity: 10_000, returnsPct: 0 })
+  })
+
+  it('adds realized and unrealized PnL to equity', () => {
+    expect(computePortfolio(300, -50, 10_000)).toEqual({ equity: 10_250, returnsPct: 2.5 })
+  })
+
+  it('reflects a loss as negative returns', () => {
+    const { equity, returnsPct } = computePortfolio(-500, -500, 10_000)
+    expect(equity).toBe(9_000)
+    expect(returnsPct).toBeCloseTo(-10)
   })
 })

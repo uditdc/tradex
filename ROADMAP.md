@@ -572,15 +572,60 @@ Notes:
 ---
 
 ## Phase 11 — Global paper portfolio
-- [ ] Global paper account: starting balance $10,000, realized-PnL ledger (Phase 10),
+- [x] Global paper account: starting balance $10,000, realized-PnL ledger (Phase 10),
       unrealized PnL from open positions with live data, equity, returns %
-- [ ] New UI surface for it (not in the mockup — placement is a real design decision:
+- [x] New UI surface for it (not in the mockup — placement is a real design decision:
       dedicated panel vs. a StatusLine strip; decide when building this phase)
 
 **Done when:** opening/closing paper trades across multiple coins visibly moves a
 single portfolio equity/returns number, and it survives a reload.
 
 Notes:
+
+- **Placement decision:** the StatusLine strip, not a dedicated panel. CLAUDE.md's
+  layout is locked at top bar / chart / AI panel (Phase 6 explicitly removed the
+  one column that used to exist), so a new panel would mean re-opening that
+  decision; the status line is already the app's "always-visible account facts"
+  row (WS state, latency, updated) and a single global equity number fits that
+  same register without disturbing the locked layout. Made the call directly
+  rather than re-asking, since Phase 6's own notes already established the
+  precedent (indicator panel removal) for resolving a layout question against
+  what's already locked instead of adding new chrome.
+- `lib/sim.ts`: `computePortfolio(realizedPnl, unrealizedPnl, startingBalance =
+  STARTING_BALANCE)` → `{ equity, returnsPct }`, pure, 3 new unit tests.
+  `STARTING_BALANCE = 10_000` lives here (not in `store/`) since it's a fact about
+  the paper-trading domain, not app state.
+- `store/index.ts` gained `realizedPnl` (in-memory, starts at 0) and a
+  `hydrateRealizedPnl` action. `closePosition` now adds the booked pnl straight
+  into `realizedPnl` in the same `set()` call as the ledger write — this is what
+  makes equity update the instant a position closes, not on the next IndexedDB
+  round-trip. New `hooks/usePersistedLedger.ts` (mounted once in `App.tsx`, same
+  shape as Phase 9's `usePersistedPositions`) loads the ledger's summed total once
+  on startup so a reload starts from the real historical total instead of 0.
+- `unrealizedPnl` in `StatusLine.tsx` is the same "sum PnL for positions with a
+  live price source" computation that already existed there pre-Phase-11 (and
+  still separately exists in `AiPanel.tsx` for its own itemized total) — left as
+  independent, duplicated small computations in both components rather than
+  centralizing into a shared selector; the two are genuinely different rendering
+  contexts (an always-visible strip vs. an itemized position list) and the
+  computation is three lines, not worth an abstraction for.
+- StatusLine's old conditional "Sim P&L" (only shown when `positions.length > 0`)
+  was replaced by always-visible `EQUITY`/`RETURNS`, plus a still-conditional
+  `UNREALIZED` entry for when positions are actually open — equity/returns is a
+  persistent account-level fact (meaningful even with zero open positions, since
+  realized history alone moves it) so unlike the old Sim P&L it shouldn't
+  disappear just because nothing's open right now.
+- **Verified in a real browser** (Playwright): confirmed the status line reads
+  `EQUITY $10000.00` / `RETURNS +0.00%` on a fresh load with an empty ledger, then
+  forced an immediate take-profit auto-close (same technique as Phase 10's
+  verification) and confirmed equity/returns updated to reflect the real booked
+  pnl (`EQUITY $10004.91` / `RETURNS +0.05%` in this run) within about a second —
+  first pass at reading the status line too early (300ms after the close) is what
+  caught that the update isn't instantaneous-instantaneous (a render tick behind
+  the IndexedDB write firing), not an actual bug; a longer, deliberate wait
+  confirmed the number is correct and stable, not still climbing. Reloaded the
+  page and confirmed the same equity/returns persisted (loaded from the ledger via
+  `usePersistedLedger`, not reset to the $10,000 starting point).
 
 ---
 

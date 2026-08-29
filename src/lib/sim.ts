@@ -81,3 +81,22 @@ export function checkSlTp(
   }
   return null
 }
+
+/** Starting balance of the global paper-trading account (CLAUDE.md's paper-trading simulator — no real funds). */
+export const STARTING_BALANCE = 10_000
+
+export interface Portfolio {
+  equity: number
+  returnsPct: number
+}
+
+/** Global paper-account equity: starting balance plus every realized close plus current open positions' unrealized PnL. */
+export function computePortfolio(
+  realizedPnl: number,
+  unrealizedPnl: number,
+  startingBalance: number = STARTING_BALANCE,
+): Portfolio {
+  const equity = startingBalance + realizedPnl + unrealizedPnl
+  const returnsPct = ((equity - startingBalance) / startingBalance) * 100
+  return { equity, returnsPct }
+}

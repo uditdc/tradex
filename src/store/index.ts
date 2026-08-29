@@ -46,6 +46,8 @@ interface AppStore {
   positions: SimPosition[]
   simSizeUsd: number
   simLeverage: number
+  /** Sum of every booked ledger entry's PnL — the realized half of the global paper account's equity. */
+  realizedPnl: number
 
   setCoinInterval: (coin: string, interval: string) => void
   setCandles: (candles: Candle[]) => void
@@ -70,6 +72,8 @@ interface AppStore {
   updatePositionSlTp: (id: number, patch: { stopLoss?: number; takeProfit?: number }) => void
   /** Replaces the in-memory position list with what's in durable storage; called once on startup. */
   hydratePositions: (positions: SimPosition[]) => void
+  /** Seeds `realizedPnl` from the durable ledger's total; called once on startup. */
+  hydrateRealizedPnl: (total: number) => void
   setSimSizeUsd: (sizeUsd: number) => void
   setSimLeverage: (leverage: number) => void
 }
@@ -90,6 +94,7 @@ export const useAppStore = create<AppStore>((set) => ({
   positions: [],
   simSizeUsd: 5000,
   simLeverage: 5,
+  realizedPnl: 0,
 
   setCoinInterval: (coin, interval) => set({ coin, interval }),
   setCandles: (candles) => set({ candles }),
@@ -113,23 +118,27 @@ export const useAppStore = create<AppStore>((set) => ({
   closePosition: (id, exitPrice, reason) =>
     set((s) => {
       const position = s.positions.find((p) => p.id === id)
-      if (position && exitPrice !== null) {
-        void addLedgerEntry({
-          coin: position.coin,
-          interval: position.interval,
-          side: position.side,
-          sizeUsd: position.sizeUsd,
-          leverage: position.leverage,
-          entryPrice: position.entryPrice,
-          exitPrice,
-          pnl: pnlForPosition(position, exitPrice),
-          openedAt: position.openedAt,
-          closedAt: Date.now(),
-          reason,
-        })
+      const positions = s.positions.filter((p) => p.id !== id)
+      if (!position || exitPrice === null) {
+        void deletePosition(id)
+        return { positions }
       }
+      const pnl = pnlForPosition(position, exitPrice)
+      void addLedgerEntry({
+        coin: position.coin,
+        interval: position.interval,
+        side: position.side,
+        sizeUsd: position.sizeUsd,
+        leverage: position.leverage,
+        entryPrice: position.entryPrice,
+        exitPrice,
+        pnl,
+        openedAt: position.openedAt,
+        closedAt: Date.now(),
+        reason,
+      })
       void deletePosition(id)
-      return { positions: s.positions.filter((p) => p.id !== id) }
+      return { positions, realizedPnl: s.realizedPnl + pnl }
     }),
   updatePositionSlTp: (id, patch) =>
     set((s) => {
@@ -139,6 +148,7 @@ export const useAppStore = create<AppStore>((set) => ({
       return { positions }
     }),
   hydratePositions: (positions) => set({ positions }),
+  hydrateRealizedPnl: (realizedPnl) => set({ realizedPnl }),
   setSimSizeUsd: (simSizeUsd) => set({ simSizeUsd }),
   setSimLeverage: (simLeverage) => set({ simLeverage }),
 }))
