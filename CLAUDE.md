@@ -19,7 +19,9 @@ but they still drive the chart's price lines and the AI trade suggestion's targe
 - Order placement, wallet connection, signing, keys of any kind in the browser —
   the paper-trading simulator is exempt only because it is pure local state with no
   real order ever sent; it must never grow a real execution path
-- Auth, multi-user anything, databases
+- Auth, multi-user anything, server-side databases — client-side IndexedDB for local
+  read/trade history (`lib/storage`) is not this; it never leaves the browser and has
+  no server or multi-user component
 - Backtesting or strategy tooling
 - Server-side rendering; this is a local tool, not a deployed product
 

@@ -6,6 +6,7 @@ import type { AiRead } from '../lib/ai/types'
 import { MIN_CANDLES, computeAll } from '../lib/indicators'
 import { l2Book, metaAndAssetCtxs } from '../lib/hl/rest'
 import type { Candle, MarketCtx } from '../lib/hl/types'
+import { getLatestRead, saveRead } from '../lib/storage/reads'
 import { useAppStore } from '../store'
 
 function cacheKey(coin: string, interval: string): string {
@@ -33,7 +34,9 @@ async function runRead(coin: string, interval: string, candles: Candle[], market
       parsed,
       error: parsed ? undefined : 'Model did not return strict JSON — showing raw text.',
     })
-    addLogEntry({ timestamp: Date.now(), coin, interval, kind: 'read', text, parsed })
+    const timestamp = Date.now()
+    addLogEntry({ timestamp, coin, interval, kind: 'read', text, parsed })
+    void saveRead(coin, interval, { timestamp, text, parsed })
     return parsed
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -103,8 +106,29 @@ export function useAiRead(): void {
     // Read the cache imperatively (not as a reactive selector) so this effect only
     // re-runs when [key, ready] change, not on every streamed token elsewhere.
     if (!ready || useAppStore.getState().aiReadCache[key]) return
-    void triggerRead()
-  }, [key, ready])
+
+    let cancelled = false
+    void (async () => {
+      // Try the durable per-coin history before generating a new one: a prior
+      // session's read for this coin/interval shows instantly instead of
+      // re-triggering the LLM on every reload/switch.
+      const stored = await getLatestRead(coin, interval)
+      if (cancelled || useAppStore.getState().aiReadCache[key]) return
+      if (stored) {
+        useAppStore.getState().setAiRead(key, {
+          status: 'done',
+          text: stored.text,
+          parsed: stored.parsed,
+          error: stored.parsed ? undefined : 'Model did not return strict JSON — showing raw text.',
+        })
+      } else {
+        void triggerRead()
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [key, ready, coin, interval])
 
   const prevBarCloseRef = useRef(lastBarCloseAt)
   useEffect(() => {

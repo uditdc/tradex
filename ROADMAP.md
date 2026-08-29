@@ -406,18 +406,58 @@ Notes:
 ---
 
 ## Phase 8 — Local storage layer: AI read history per coin
-- [ ] New `lib/storage` (IndexedDB) storing AI reads per `${coin}:${interval}`,
+- [x] New `lib/storage` (IndexedDB) storing AI reads per `${coin}:${interval}`,
       keyed by timestamp, with a capped history length per key
-- [ ] Coin/interval switch shows the latest stored read instantly instead of
+- [x] Coin/interval switch shows the latest stored read instantly instead of
       re-triggering generation; generation still fires on bar-close, manual
       palette action, or when no stored read exists yet
-- [ ] CLAUDE.md's "no databases" non-goal gets a one-line carve-out: client-side
+- [x] CLAUDE.md's "no databases" non-goal gets a one-line carve-out: client-side
       IndexedDB for local read/trade history is not the disallowed server database
 
 **Done when:** reloading the page or switching coins back and forth shows prior
 reads without re-generating, and history survives a reload.
 
 Notes:
+
+- `lib/storage/db.ts`: a thin promise wrapper around raw IndexedDB (no `idb`
+  dependency needed for one object store) — `withStore(name, mode, fn)` opens a
+  fresh connection, runs one transaction, closes it. Not caching the connection
+  keeps each call self-contained and made the store trivially testable; this app's
+  read volume (single-digit reads per minute at most) makes the per-call open/close
+  cost irrelevant.
+- `lib/storage/reads.ts`: `saveRead`/`getLatestRead`/`getReadHistory`, keyed by
+  `${coin}:${interval}` via a `key` index (IndexedDB has no compound-key `get`
+  without a compound index, and a single string key is simpler than one). Capped at
+  20 entries per key — oldest trimmed after each save. `getReadHistory` exists now
+  for Phase 12's "AI's own last stored trade suggestion for that coin," not used
+  anywhere yet.
+- Tested with `fake-indexeddb` (new devDependency) since jsdom (this project's
+  vitest environment) has no IndexedDB implementation — `beforeEach` reassigns
+  `globalThis.indexedDB` to a fresh `IDBFactory` so tests don't leak state into each
+  other via a shared fake DB.
+- `useAiRead.ts`: every completed read (`status: 'done'`, parsed or raw-text
+  fallback) is persisted via `saveRead`, fire-and-forget. The coin/interval-switch
+  effect now checks `getLatestRead` before calling `triggerRead` — the in-memory
+  `aiReadCache` (Phase 4) is unchanged and still wins when already populated this
+  session; IndexedDB is the second-tier check, only reached when nothing's cached
+  in memory (fresh switch this session, or a reload). Race guarded: the async IDB
+  lookup re-checks `aiReadCache` after resolving, in case a bar-close trigger beat
+  it to the same key.
+- **Verified in a real browser** (Playwright, driven from a throwaway script — no
+  `chromium-cli` in this environment, so used the `playwright` npm package
+  directly, same workaround Phase 3 used): instrumented `/api/read` request count
+  and IndexedDB entry count through a full sequence — initial load, switch to BTC,
+  switch back to HYPE, full page reload. Confirmed `/api/read` fired exactly once
+  for HYPE and once for BTC (their first-ever loads), then **zero** additional
+  requests on switch-back or reload, while the IndexedDB `reads` store held the
+  entries across the reload (count unchanged, not regenerated, not duplicated) —
+  this is the actual assertion Phase 8 needs, not just that panel text appeared.
+- Hit the same free-tier `google/gemma-4-31b-it:free` 429 rate limit documented
+  since Phase 4/5/7 during verification (both real reads got rate-limited), so the
+  stored/replayed entries in this run are the raw-text-fallback shape, not clean
+  parsed JSON — irrelevant to what Phase 8 verifies (persistence and reuse, not
+  model output quality), and consistent with prior phases' notes on this being an
+  existing operational constraint, not a regression.
 
 ---
 
