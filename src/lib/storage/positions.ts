@@ -14,6 +14,8 @@ export interface SimPosition {
   leverage: number
   entryPrice: number
   openedAt: number
+  stopLoss?: number
+  takeProfit?: number
 }
 
 export async function savePosition(position: SimPosition): Promise<void> {

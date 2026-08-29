@@ -508,18 +508,66 @@ Notes:
 ---
 
 ## Phase 10 — Proper perp paper-trading mechanics
-- [ ] `SimPosition` gains optional `stopLoss`/`takeProfit`, settable at open (and
+- [x] `SimPosition` gains optional `stopLoss`/`takeProfit`, settable at open (and
       editable after)
-- [ ] Auto-close when live price crosses SL or TP, for coins with live data (active
+- [x] Auto-close when live price crosses SL or TP, for coins with live data (active
       coin or watchlist — same constraint as today's PnL/verdict availability)
-- [ ] Every close (manual or SL/TP-triggered) books realized PnL to a running ledger
+- [x] Every close (manual or SL/TP-triggered) books realized PnL to a running ledger
       (needed by Phase 11)
-- [ ] `lib/sim.ts` SL/TP direction logic (long vs. short) is pure and unit-tested
+- [x] `lib/sim.ts` SL/TP direction logic (long vs. short) is pure and unit-tested
 
 **Done when:** a position with SL/TP set auto-closes correctly when price crosses
 either level, and the realized-PnL ledger reflects it.
 
 Notes:
+
+- `lib/sim.ts`'s new `checkSlTp(position, currentPrice)` is pure and mirrors the
+  existing `computePositionVerdict`'s direction-flip pattern: for a long, stop is
+  below entry / target above; for a short it flips. Returns `'stop_loss' |
+  'take_profit' | null`, only checking whichever of the two levels is actually set
+  (both are optional). 6 new unit tests in `sim.test.ts`.
+- New `lib/storage/ledger.ts` (`addLedgerEntry`/`getLedger`) on a `ledger` object
+  store (`db.ts` bumped `DB_VERSION` 2 → 3, same idempotent-upgrade pattern as
+  Phase 9). Records coin/side/size/leverage/entry/exit/pnl/openedAt/closedAt/reason
+  — `getLedger` isn't consumed by any UI yet, same "built for the next phase, not
+  wired to a panel yet" shape as Phase 8's `getReadHistory`; Phase 11 is what reads
+  it for portfolio equity.
+- `store/index.ts`'s `closePosition` signature changed from `(id)` to `(id,
+  exitPrice, reason)` — every close now needs a real exit price to book a ledger
+  entry via `pnlForPosition` (imported from `lib/sim`, same PnL math the panel
+  already displays). If `exitPrice` is `null` (no live price source for that
+  position's coin — the existing "not the active coin or on the watchlist"
+  constraint from `livePriceForPosition`), the position is still removed but
+  nothing is booked, since there's no real number to record; this is a pre-existing
+  limitation of the app's single-subscription data model, not new to this phase.
+  New `updatePositionSlTp(id, patch)` action write-throughs an edited SL/TP to
+  storage the same way `openPosition` already does.
+- New `hooks/usePositionMonitor.ts` (mounted once in `App.tsx`) re-checks every
+  open position's SL/TP against its live price whenever `candles` (active-coin WS
+  ticks) or `watchlistData` (background poll) changes, and calls `closePosition`
+  with the crossed reason the instant a level is crossed — this is what makes
+  auto-close actually "live" rather than only checked on the next manual re-run.
+- `AiPanel.tsx`: the trade-suggestion card's Target/Stop labels became editable
+  number inputs (defaulting to the swing-level suggestion via `placeholder`, not
+  a controlled default value, so an empty field still falls back to the live
+  suggestion at open time) — local `slDraft`/`tpDraft` state, reset by giving the
+  inputs a `key` of `${coin}-${interval}-...` rather than an effect, so switching
+  coin/interval naturally remounts them with a clean draft. Each open position row
+  gained its own small TP/SL inputs, `onBlur`-committed straight to
+  `updatePositionSlTp` (no separate "save" step — this app's IndexedDB write volume
+  is trivial, so debouncing wasn't worth the complexity). The ✕ close button now
+  resolves the position's current live price (already computed per-row for PnL)
+  and passes it through as the manual close's exit price.
+- **Verified in a real browser** (Playwright): (1) set an absurd take-profit
+  (999999 on a short, so `currentPrice <= takeProfit` is true immediately), opened
+  a position, and watched it auto-close on the very next live WS tick — IndexedDB's
+  `positions` count went 0→1→0 and `ledger` went 0→1 within ~1 second, with the
+  booked entry showing `reason: "take_profit"` and a real entryPrice/exitPrice/pnl,
+  not a placeholder. (2) Opened a position with no manual TP/SL override (so it
+  used the live swing-level suggestion) and closed it via the ✕ button — confirmed
+  a second ledger entry with `reason: "manual"` and a real, small pnl matching the
+  brief entry→exit price move. Both runs also confirmed the position actually
+  leaves the open list (`POSITIONS (0)`) once closed either way.
 
 ---
 

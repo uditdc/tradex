@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computePositionVerdict, livePriceForPosition, pnlForPosition, suggestionSideFromBias } from './sim'
+import { checkSlTp, computePositionVerdict, livePriceForPosition, pnlForPosition, suggestionSideFromBias } from './sim'
 
 describe('livePriceForPosition', () => {
   it('uses the active price when the position is on the active coin', () => {
@@ -51,5 +51,37 @@ describe('suggestionSideFromBias', () => {
     expect(suggestionSideFromBias('long')).toBe('long')
     expect(suggestionSideFromBias('neutral')).toBe('long')
     expect(suggestionSideFromBias(undefined)).toBe('long')
+  })
+})
+
+describe('checkSlTp', () => {
+  it('returns null when neither level is set', () => {
+    expect(checkSlTp({ side: 'long' }, 100)).toBeNull()
+  })
+
+  it('returns null while a long sits between its stop and target', () => {
+    expect(checkSlTp({ side: 'long', stopLoss: 90, takeProfit: 110 }, 100)).toBeNull()
+  })
+
+  it('closes a long on stop-loss when price drops to or below it', () => {
+    expect(checkSlTp({ side: 'long', stopLoss: 90, takeProfit: 110 }, 90)).toBe('stop_loss')
+    expect(checkSlTp({ side: 'long', stopLoss: 90, takeProfit: 110 }, 85)).toBe('stop_loss')
+  })
+
+  it('closes a long on take-profit when price rises to or above it', () => {
+    expect(checkSlTp({ side: 'long', stopLoss: 90, takeProfit: 110 }, 110)).toBe('take_profit')
+    expect(checkSlTp({ side: 'long', stopLoss: 90, takeProfit: 110 }, 120)).toBe('take_profit')
+  })
+
+  it('flips direction for a short: stop above entry, target below', () => {
+    expect(checkSlTp({ side: 'short', stopLoss: 110, takeProfit: 90 }, 100)).toBeNull()
+    expect(checkSlTp({ side: 'short', stopLoss: 110, takeProfit: 90 }, 110)).toBe('stop_loss')
+    expect(checkSlTp({ side: 'short', stopLoss: 110, takeProfit: 90 }, 90)).toBe('take_profit')
+  })
+
+  it('only honors the levels that are actually set', () => {
+    expect(checkSlTp({ side: 'long', stopLoss: 90 }, 85)).toBe('stop_loss')
+    expect(checkSlTp({ side: 'long', stopLoss: 90 }, 200)).toBeNull()
+    expect(checkSlTp({ side: 'long', takeProfit: 110 }, 110)).toBe('take_profit')
   })
 })

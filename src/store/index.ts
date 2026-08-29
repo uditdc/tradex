@@ -3,6 +3,9 @@ import type { AskState, LogEntry, ReadState } from '../lib/ai/types'
 import type { Candle, MarketCtx } from '../lib/hl/types'
 import type { ConnectionStatus } from '../lib/hl/ws'
 import type { Bias, Regime } from '../lib/indicators/types'
+import { pnlForPosition } from '../lib/sim'
+import { addLedgerEntry } from '../lib/storage/ledger'
+import type { CloseReason } from '../lib/storage/ledger'
 import { deletePosition, savePosition } from '../lib/storage/positions'
 import type { SimPosition } from '../lib/storage/positions'
 
@@ -57,7 +60,14 @@ interface AppStore {
   setWatchlistEntry: (coin: string, entry: WatchlistEntry) => void
 
   openPosition: (input: Omit<SimPosition, 'id' | 'openedAt'>) => void
-  closePosition: (id: number) => void
+  /**
+   * Closes a position and books its realized PnL to the ledger. `exitPrice` is the
+   * live price at close time, or null if no live source exists for that coin right
+   * now (see `livePriceForPosition`) — in that case the position is still removed
+   * but nothing is booked, since we have no real exit price to compute PnL from.
+   */
+  closePosition: (id: number, exitPrice: number | null, reason: CloseReason) => void
+  updatePositionSlTp: (id: number, patch: { stopLoss?: number; takeProfit?: number }) => void
   /** Replaces the in-memory position list with what's in durable storage; called once on startup. */
   hydratePositions: (positions: SimPosition[]) => void
   setSimSizeUsd: (sizeUsd: number) => void
@@ -100,10 +110,33 @@ export const useAppStore = create<AppStore>((set) => ({
       void savePosition(position)
       return { positions: [position, ...s.positions] }
     }),
-  closePosition: (id) =>
+  closePosition: (id, exitPrice, reason) =>
     set((s) => {
+      const position = s.positions.find((p) => p.id === id)
+      if (position && exitPrice !== null) {
+        void addLedgerEntry({
+          coin: position.coin,
+          interval: position.interval,
+          side: position.side,
+          sizeUsd: position.sizeUsd,
+          leverage: position.leverage,
+          entryPrice: position.entryPrice,
+          exitPrice,
+          pnl: pnlForPosition(position, exitPrice),
+          openedAt: position.openedAt,
+          closedAt: Date.now(),
+          reason,
+        })
+      }
       void deletePosition(id)
       return { positions: s.positions.filter((p) => p.id !== id) }
+    }),
+  updatePositionSlTp: (id, patch) =>
+    set((s) => {
+      const positions = s.positions.map((p) => (p.id === id ? { ...p, ...patch } : p))
+      const updated = positions.find((p) => p.id === id)
+      if (updated) void savePosition(updated)
+      return { positions }
     }),
   hydratePositions: (positions) => set({ positions }),
   setSimSizeUsd: (simSizeUsd) => set({ simSizeUsd }),

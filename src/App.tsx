@@ -7,6 +7,7 @@ import { Watchlist } from './components/Watchlist'
 import { useAiRead } from './hooks/useAiRead'
 import { useCandles } from './hooks/useCandles'
 import { usePersistedPositions } from './hooks/usePersistedPositions'
+import { usePositionMonitor } from './hooks/usePositionMonitor'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useAppStore } from './store'
 
@@ -17,6 +18,7 @@ function App() {
   useAiRead()
   useWatchlist()
   usePersistedPositions()
+  usePositionMonitor()
 
   return (
     <div className="bg-term-bg flex h-screen w-screen flex-col overflow-hidden">

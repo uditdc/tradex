@@ -60,3 +60,24 @@ export function computePositionVerdict(
 export function suggestionSideFromBias(bias: string | undefined): 'long' | 'short' {
   return (bias ?? '').toLowerCase().includes('short') ? 'short' : 'long'
 }
+
+export type SlTpReason = 'stop_loss' | 'take_profit'
+
+/**
+ * Whether a position's own stop-loss/take-profit has been crossed by the current
+ * price. Direction flips for shorts: a stop sits above entry, a target below.
+ * Returns null if neither level is set or neither has been crossed yet.
+ */
+export function checkSlTp(
+  position: Pick<SimPositionLike, 'side'> & { stopLoss?: number; takeProfit?: number },
+  currentPrice: number,
+): SlTpReason | null {
+  if (position.side === 'long') {
+    if (position.stopLoss != null && currentPrice <= position.stopLoss) return 'stop_loss'
+    if (position.takeProfit != null && currentPrice >= position.takeProfit) return 'take_profit'
+  } else {
+    if (position.stopLoss != null && currentPrice >= position.stopLoss) return 'stop_loss'
+    if (position.takeProfit != null && currentPrice <= position.takeProfit) return 'take_profit'
+  }
+  return null
+}

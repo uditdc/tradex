@@ -3,6 +3,7 @@ import { useAppStore } from '../store'
 import { useIndicators } from '../hooks/useIndicators'
 import { computePositionVerdict, livePriceForPosition, pnlForPosition, suggestionSideFromBias } from '../lib/sim'
 import type { Verdict } from '../lib/sim'
+import type { SimPosition } from '../lib/storage/positions'
 
 function biasClass(bias: string): string {
   const lower = bias.toLowerCase()
@@ -29,6 +30,7 @@ export function AiPanel() {
   const setSimLeverage = useAppStore((s) => s.setSimLeverage)
   const openPosition = useAppStore((s) => s.openPosition)
   const closePosition = useAppStore((s) => s.closePosition)
+  const updatePositionSlTp = useAppStore((s) => s.updatePositionSlTp)
   const dict = useIndicators()
 
   const [rationaleExpanded, setRationaleExpanded] = useState(false)
@@ -41,9 +43,26 @@ export function AiPanel() {
   const suggestionTarget = suggestionSide === 'long' ? dict?.swingResistance?.price : dict?.swingSupport?.price
   const suggestionStop = suggestionSide === 'long' ? dict?.swingSupport?.price : dict?.swingResistance?.price
 
+  // Reset when the suggestion's coin/interval changes (see the `key` prop on the
+  // inputs below) rather than via an effect — a fresh mount is simpler than
+  // syncing stale drafts.
+  const [slDraft, setSlDraft] = useState<string>('')
+  const [tpDraft, setTpDraft] = useState<string>('')
+  const stopLoss = slDraft !== '' ? Number(slDraft) : suggestionStop
+  const takeProfit = tpDraft !== '' ? Number(tpDraft) : suggestionTarget
+
   function handleOpen() {
     if (activePrice === null) return
-    openPosition({ coin, interval, side: suggestionSide, sizeUsd: simSizeUsd, leverage: simLeverage, entryPrice: activePrice })
+    openPosition({
+      coin,
+      interval,
+      side: suggestionSide,
+      sizeUsd: simSizeUsd,
+      leverage: simLeverage,
+      entryPrice: activePrice,
+      stopLoss,
+      takeProfit,
+    })
   }
 
   function handleRerun() {
@@ -65,9 +84,13 @@ export function AiPanel() {
   const positionRows = positions.map((p) => {
     const cur = livePriceForPosition(p, coin, activePrice, watchlistData)
     const pnl = cur !== null ? pnlForPosition(p, cur) : null
-    return { position: p, pnl, verdict: verdicts[p.id] }
+    return { position: p, pnl, cur, verdict: verdicts[p.id] }
   })
   const totalPnl = positionRows.reduce((sum, r) => sum + (r.pnl ?? 0), 0)
+
+  function handleClose(position: SimPosition, exitPrice: number | null) {
+    closePosition(position.id, exitPrice, 'manual')
+  }
 
   return (
     <div className="border-term-border bg-term-panel flex w-80 shrink-0 flex-col gap-3 overflow-y-auto border-l p-3">
@@ -178,10 +201,30 @@ export function AiPanel() {
                 <span className="text-term-muted text-xs">{Math.round(read.parsed.confidence * 100)}% confidence</span>
               )}
             </div>
-            <div className="text-term-muted flex justify-between gap-2 text-xs">
+            <div className="text-term-muted flex items-center justify-between gap-2 text-xs">
               <span>Entry {activePrice !== null ? activePrice.toFixed(2) : '—'}</span>
-              <span>Target {suggestionTarget !== undefined ? suggestionTarget.toFixed(2) : '—'}</span>
-              <span>Stop {suggestionStop !== undefined ? suggestionStop.toFixed(2) : '—'}</span>
+              <span className="flex items-center gap-1">
+                TP
+                <input
+                  key={`${coin}-${interval}-tp`}
+                  type="number"
+                  placeholder={suggestionTarget !== undefined ? suggestionTarget.toFixed(2) : '—'}
+                  value={tpDraft}
+                  onChange={(e) => setTpDraft(e.target.value)}
+                  className="text-term-up border-term-border w-16 rounded-sm border bg-transparent px-1 py-0.5 text-right"
+                />
+              </span>
+              <span className="flex items-center gap-1">
+                SL
+                <input
+                  key={`${coin}-${interval}-sl`}
+                  type="number"
+                  placeholder={suggestionStop !== undefined ? suggestionStop.toFixed(2) : '—'}
+                  value={slDraft}
+                  onChange={(e) => setSlDraft(e.target.value)}
+                  className="text-term-down border-term-border w-16 rounded-sm border bg-transparent px-1 py-0.5 text-right"
+                />
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-term-muted w-8 shrink-0 text-[10px]">Size</span>
@@ -236,7 +279,7 @@ export function AiPanel() {
 
         {positions.length === 0 && <p className="text-term-muted text-sm">No simulated positions yet.</p>}
 
-        {positionRows.map(({ position, pnl, verdict }) => (
+        {positionRows.map(({ position, pnl, cur, verdict }) => (
           <div key={position.id} className="border-term-border flex flex-col gap-1.5 rounded-sm border p-2">
             <div className="flex items-baseline justify-between">
               <span className="flex items-center gap-1.5">
@@ -245,7 +288,7 @@ export function AiPanel() {
                 </span>
                 <span className="border-term-violet text-term-violet rounded-sm border px-1 text-[9px]">SIM</span>
               </span>
-              <button type="button" onClick={() => closePosition(position.id)} className="text-term-muted text-xs">
+              <button type="button" onClick={() => handleClose(position, cur)} className="text-term-muted text-xs">
                 ✕
               </button>
             </div>
@@ -257,6 +300,36 @@ export function AiPanel() {
                 className={`text-sm font-semibold ${pnl === null ? 'text-term-muted' : pnl >= 0 ? 'text-term-up' : 'text-term-down'}`}
               >
                 {pnl === null ? '—' : fmtUsd(pnl)}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="text-term-up flex items-center gap-1">
+                TP
+                <input
+                  type="number"
+                  defaultValue={position.takeProfit ?? ''}
+                  onBlur={(e) =>
+                    updatePositionSlTp(position.id, {
+                      stopLoss: position.stopLoss,
+                      takeProfit: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="border-term-border w-14 rounded-sm border bg-transparent px-1 py-0.5 text-right"
+                />
+              </span>
+              <span className="text-term-down flex items-center gap-1">
+                SL
+                <input
+                  type="number"
+                  defaultValue={position.stopLoss ?? ''}
+                  onBlur={(e) =>
+                    updatePositionSlTp(position.id, {
+                      stopLoss: e.target.value === '' ? undefined : Number(e.target.value),
+                      takeProfit: position.takeProfit,
+                    })
+                  }
+                  className="border-term-border w-14 rounded-sm border bg-transparent px-1 py-0.5 text-right"
+                />
               </span>
             </div>
             {verdict && (
