@@ -1,6 +1,6 @@
 import type { Candle, MarketCtx, OrderBook } from '../hl/types'
 import type { IndicatorDict } from '../indicators/types'
-import type { AiContext } from './types'
+import type { AiContext, OpenPositionContext, PriorSuggestion } from './types'
 
 export const DEFAULT_CANDLE_COUNT = 200
 const BOOK_DEPTH = 5
@@ -13,6 +13,8 @@ export function buildContext(
   marketCtx: MarketCtx,
   book: OrderBook,
   candleCount = DEFAULT_CANDLE_COUNT,
+  openPositions: OpenPositionContext[] = [],
+  priorSuggestion: PriorSuggestion | null = null,
 ): AiContext {
   return {
     symbol,
@@ -25,5 +27,7 @@ export function buildContext(
       bids: book.bids.slice(0, BOOK_DEPTH),
       asks: book.asks.slice(0, BOOK_DEPTH),
     },
+    openPositions: openPositions.length > 0 ? openPositions : undefined,
+    priorSuggestion: priorSuggestion ?? undefined,
   }
 }

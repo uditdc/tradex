@@ -183,6 +183,26 @@ export function AiPanel() {
             <span className="text-term-down text-[11px] tracking-widest uppercase">✕ Invalidation</span>
             <p className="text-term-muted">{read.parsed.invalidation}</p>
           </div>
+
+          {read.parsed.position_guidance && (
+            <div className="border-term-violet/60 flex flex-col gap-1 rounded-sm border p-2">
+              <span className="text-term-violet text-[11px] tracking-widest uppercase">◆ Position Guidance</span>
+              <div className="flex items-baseline gap-1.5">
+                <span
+                  className={`text-xs font-semibold uppercase ${
+                    read.parsed.position_guidance.action === 'close'
+                      ? 'text-term-down'
+                      : read.parsed.position_guidance.action === 'keep'
+                        ? 'text-term-up'
+                        : 'text-term-amber'
+                  }`}
+                >
+                  {read.parsed.position_guidance.action}
+                </span>
+                <span className="text-term-muted">{read.parsed.position_guidance.note}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

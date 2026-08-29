@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react'
 import { buildContext } from '../lib/ai/context'
 import { requestAsk, requestRead } from '../lib/ai/client'
 import { parseAiRead } from '../lib/ai/parse'
-import type { AiRead } from '../lib/ai/types'
+import type { AiRead, OpenPositionContext, PriorSuggestion } from '../lib/ai/types'
 import { MIN_CANDLES, computeAll } from '../lib/indicators'
 import { l2Book, metaAndAssetCtxs } from '../lib/hl/rest'
 import type { Candle, MarketCtx } from '../lib/hl/types'
+import { pnlForPosition } from '../lib/sim'
 import { getLatestRead, saveRead } from '../lib/storage/reads'
 import { useAppStore } from '../store'
 
@@ -15,14 +16,41 @@ function cacheKey(coin: string, interval: string): string {
 
 /** Core of an AI read for an arbitrary coin/interval; shared by the active-coin and background paths. */
 async function runRead(coin: string, interval: string, candles: Candle[], marketCtx: MarketCtx): Promise<AiRead | null> {
-  const { setAiRead, addLogEntry } = useAppStore.getState()
+  const { setAiRead, addLogEntry, positions } = useAppStore.getState()
   const key = cacheKey(coin, interval)
   setAiRead(key, { status: 'loading', text: '', parsed: null })
 
   try {
     const indicators = computeAll(candles)
     const book = await l2Book(coin)
-    const context = buildContext(coin, interval, candles, indicators, marketCtx, book)
+
+    const activePrice = candles.length > 0 ? candles[candles.length - 1].close : null
+    const openPositions: OpenPositionContext[] = positions
+      .filter((p) => p.coin === coin)
+      .map((p) => ({
+        side: p.side,
+        entryPrice: p.entryPrice,
+        sizeUsd: p.sizeUsd,
+        leverage: p.leverage,
+        stopLoss: p.stopLoss,
+        takeProfit: p.takeProfit,
+        unrealizedPnl: activePrice !== null ? pnlForPosition(p, activePrice) : null,
+      }))
+
+    // The read this call is about to overwrite is exactly "the AI's own last
+    // suggestion for this coin/interval" — fetch it before saveRead below replaces it.
+    const priorRead = await getLatestRead(coin, interval)
+    const priorSuggestion: PriorSuggestion | null = priorRead?.parsed
+      ? {
+          bias: priorRead.parsed.bias,
+          key_levels: priorRead.parsed.key_levels,
+          invalidation: priorRead.parsed.invalidation,
+          rationale: priorRead.parsed.rationale,
+          timestamp: priorRead.timestamp,
+        }
+      : null
+
+    const context = buildContext(coin, interval, candles, indicators, marketCtx, book, undefined, openPositions, priorSuggestion)
 
     const text = await requestRead(context)
 

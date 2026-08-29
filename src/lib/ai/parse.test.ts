@@ -41,4 +41,23 @@ describe('parseAiRead', () => {
     const bad = { ...validRead, zones: [{ from: 80, to: 'not-a-number', label: 'AI Demand Zone' }] }
     expect(parseAiRead(JSON.stringify(bad))).toBeNull()
   })
+
+  it('parses a valid position_guidance', () => {
+    const withGuidance = { ...validRead, position_guidance: { action: 'close', note: 'Support broken, cut the long.' } }
+    expect(parseAiRead(JSON.stringify(withGuidance))).toEqual(withGuidance)
+  })
+
+  it('omitting position_guidance is valid (undefined, not required)', () => {
+    expect(parseAiRead(JSON.stringify(validRead))?.position_guidance).toBeUndefined()
+  })
+
+  it('returns null when position_guidance has an invalid action', () => {
+    const bad = { ...validRead, position_guidance: { action: 'sell', note: 'x' } }
+    expect(parseAiRead(JSON.stringify(bad))).toBeNull()
+  })
+
+  it('returns null when position_guidance is missing its note', () => {
+    const bad = { ...validRead, position_guidance: { action: 'keep' } }
+    expect(parseAiRead(JSON.stringify(bad))).toBeNull()
+  })
 })

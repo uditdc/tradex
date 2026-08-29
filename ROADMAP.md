@@ -630,18 +630,72 @@ Notes:
 ---
 
 ## Phase 12 (Big) — AI reads become position-aware
-- [ ] Context builder feeds the model, when relevant for the coin: current open
+- [x] Context builder feeds the model, when relevant for the coin: current open
       paper position(s) (side, entry, size, SL/TP, live PnL) and the AI's own last
       stored trade suggestion for that coin (from Phase 8's history)
-- [ ] AI read contract gains `position_guidance: { action: 'keep' | 'close' |
+- [x] AI read contract gains `position_guidance: { action: 'keep' | 'close' |
       'adjust', note: string }`, present only when a position or prior suggestion
       exists for the coin; parsed leniently like `zones` (undefined is valid)
-- [ ] `AiPanel` renders `position_guidance` against the relevant open position(s)
+- [x] `AiPanel` renders `position_guidance` against the relevant open position(s)
 
 **Done when:** re-running a read on a coin with an open paper position produces an
 explicit keep/close/adjust call referencing that position, not a generic read.
 
 Notes:
+
+- `lib/ai/types.ts` gained `OpenPositionContext` (side, entry, size, leverage,
+  SL/TP, `unrealizedPnl: number | null`), `PriorSuggestion` (bias/key_levels/
+  invalidation/rationale/timestamp — the useful subset of a past `AiRead`, not the
+  whole thing), and `PositionGuidance`. Both new `AiContext` fields
+  (`openPositions?`, `priorSuggestion?`) are optional and only populated when
+  actually relevant, per the contract.
+- `lib/ai/context.ts`'s `buildContext` gained two new optional trailing params
+  (`openPositions = []`, `priorSuggestion = null`) after the existing
+  `candleCount` — appended rather than turned into an options object, since every
+  existing call site already omits `candleCount` positionally and this keeps them
+  unchanged. `buildContext` omits both fields from the output entirely (not `[]`/
+  `null`) when there's nothing to say, matching how `zones` was already handled.
+- `lib/ai/parse.ts`: `position_guidance` validated the same lenient way as `zones`
+  — `undefined` is valid (field just isn't there), but if present it must be a real
+  `{action, note}` with `action` one of the three allowed values, else the whole
+  read is rejected (not just that field), consistent with the existing all-or-
+  nothing strict-parse philosophy. 4 new parse tests.
+- `hooks/useAiRead.ts`'s `runRead` (shared by both the active-coin and background/
+  watchlist read paths) now: (1) filters the store's `positions` to the coin being
+  read and maps each to `OpenPositionContext`, computing `unrealizedPnl` from that
+  same call's own `candles` (so it works identically for the watchlist's
+  independently-snapshotted candles, not just the live active-coin buffer); (2)
+  calls `getLatestRead(coin, interval)` *before* this run's own `saveRead`
+  overwrites it — that prior entry, if its `parsed` is non-null, becomes
+  `priorSuggestion`. A stored-but-unparsed prior read (raw-text rate-limit
+  fallback) correctly yields no `priorSuggestion` rather than feeding the model
+  garbage — confirmed live, see below.
+- `server/index.ts`'s `READ_SYSTEM_PROMPT` documents both optional input fields and
+  adds `position_guidance` to the required output shape, with an explicit
+  instruction to include it only when the corresponding input was present.
+- `AiPanel.tsx`: `position_guidance` renders as its own bordered block inside the
+  parsed-read section (after Invalidation), action word color-coded (up/down/amber
+  for keep/close/adjust) — conditionally rendered only when the field exists, same
+  pattern as the existing Zones block.
+- **Verified in a real browser** (Playwright), against real network requests, not
+  just unit tests: (1) opened a real paper position on HYPE, then forced a
+  brand-new read (switching to an interval never read this session) and confirmed
+  the live `/api/read` request body's `openPositions` array matched the actual
+  open position exactly, `unrealizedPnl` included — proves the position→context
+  wiring is live end-to-end, not just type-correct. (2) For `priorSuggestion`,
+  the free-tier model's persistent 429 rate limit (documented since Phase 4) meant
+  a real prior read was never cleanly parsed JSON during this session, which would
+  have made that branch untestable live — worked around it by seeding one valid
+  parsed `StoredRead` directly into IndexedDB (the same shape `saveRead` itself
+  writes), then waiting for a real 1m bar-close to fire the next automatic read:
+  the outgoing request's `priorSuggestion` matched the seeded entry exactly. This
+  is a live confirmation of the wiring using a controlled, valid input, not a
+  fabricated response — the constraint being worked around is the upstream
+  model's reliability, not anything in this app's code.
+- Did not extend `/api/ask` (the "/" ask-mode palette) with position context —
+  the roadmap item scopes this to "AI reads" specifically, and ask mode already
+  has its own separate context-attachment behavior from Phase 4 that this phase
+  didn't touch.
 
 ---
 

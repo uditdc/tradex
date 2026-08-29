@@ -1,4 +1,15 @@
-import type { AiRead, KeyLevel, Zone } from './types'
+import type { AiRead, KeyLevel, PositionGuidance, Zone } from './types'
+
+const POSITION_GUIDANCE_ACTIONS = new Set(['keep', 'close', 'adjust'])
+
+function isPositionGuidance(v: unknown): v is PositionGuidance {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    POSITION_GUIDANCE_ACTIONS.has((v as PositionGuidance).action) &&
+    typeof (v as PositionGuidance).note === 'string'
+  )
+}
 
 function isKeyLevel(v: unknown): v is KeyLevel {
   return (
@@ -42,6 +53,9 @@ export function parseAiRead(text: string): AiRead | null {
   const zones = (parsed as AiRead | null)?.zones
   const zonesValid = zones === undefined || (Array.isArray(zones) && zones.every(isZone))
 
+  const positionGuidance = (parsed as AiRead | null)?.position_guidance
+  const positionGuidanceValid = positionGuidance === undefined || isPositionGuidance(positionGuidance)
+
   if (
     typeof parsed === 'object' &&
     parsed !== null &&
@@ -51,7 +65,8 @@ export function parseAiRead(text: string): AiRead | null {
     zonesValid &&
     typeof (parsed as AiRead).invalidation === 'string' &&
     typeof (parsed as AiRead).confidence === 'number' &&
-    typeof (parsed as AiRead).rationale === 'string'
+    typeof (parsed as AiRead).rationale === 'string' &&
+    positionGuidanceValid
   ) {
     return parsed as AiRead
   }

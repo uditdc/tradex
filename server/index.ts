@@ -14,6 +14,12 @@ You will receive a JSON object describing one coin: symbol, interval, recent OHL
 indicator dict (EMA 9/21/55, RSI 14, ATR% of price, volume ratio, nearest swing support/resistance,
 a regime tag), funding rate, open interest, and the top-5 order book levels on each side.
 
+The object may also include, only when relevant for this coin:
+- "openPositions": the user's currently open hypothetical paper position(s) on this coin — side, entry
+  price, size, leverage, stop-loss/take-profit if set, and current unrealized PnL.
+- "priorSuggestion": your own last read for this exact coin/interval — its bias, key levels,
+  invalidation, and rationale, so you can say whether your thesis has changed.
+
 Respond with STRICT JSON ONLY — no markdown code fences, no commentary before or after — matching
 exactly this shape:
 {
@@ -24,7 +30,12 @@ exactly this shape:
                                                                  // stand out — do not force one
   "invalidation": string,      // the condition that would invalidate this read
   "confidence": number,        // 0 to 1
-  "rationale": string          // at most 3 sentences
+  "rationale": string,         // at most 3 sentences
+  "position_guidance": {"action": "keep" | "close" | "adjust", "note": string}
+                                // include this field ONLY if "openPositions" or "priorSuggestion" was
+                                // present in the input; omit it entirely otherwise. When present, give
+                                // an explicit call referencing the actual position(s) or prior
+                                // suggestion (its entry, PnL, or invalidation level) — not a generic read.
 }`
 
 const ASK_SYSTEM_PROMPT = `You are a market-read assistant embedded in a Hyperliquid perpetuals trading terminal.
