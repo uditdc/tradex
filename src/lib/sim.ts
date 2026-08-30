@@ -82,6 +82,18 @@ export function checkSlTp(
   return null
 }
 
+/** `+$12.34` / `-$12.34` / `$0.00` — always signed so a loss reads unambiguously without relying on color alone. */
+export function formatSignedUsd(n: number): string {
+  const sign = n > 0 ? '+' : n < 0 ? '-' : ''
+  return `${sign}$${Math.abs(n).toFixed(2)}`
+}
+
+/** `+1.50%` / `-1.50%` / `0.00%`, same signing rule as `formatSignedUsd`. */
+export function formatSignedPct(n: number): string {
+  const sign = n > 0 ? '+' : n < 0 ? '-' : ''
+  return `${sign}${Math.abs(n).toFixed(2)}%`
+}
+
 /** Starting balance of the global paper-trading account (CLAUDE.md's paper-trading simulator — no real funds). */
 export const STARTING_BALANCE = 10_000
 

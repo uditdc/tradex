@@ -1,9 +1,10 @@
+import { toast } from 'sonner'
 import { create } from 'zustand'
 import type { AskState, LogEntry, ReadState } from '../lib/ai/types'
 import type { Candle, MarketCtx } from '../lib/hl/types'
 import type { ConnectionStatus } from '../lib/hl/ws'
 import type { Bias, Regime } from '../lib/indicators/types'
-import { pnlForPosition } from '../lib/sim'
+import { formatSignedUsd, pnlForPosition } from '../lib/sim'
 import { addLedgerEntry } from '../lib/storage/ledger'
 import type { CloseReason } from '../lib/storage/ledger'
 import { deletePosition, savePosition } from '../lib/storage/positions'
@@ -121,6 +122,7 @@ export const useAppStore = create<AppStore>((set) => ({
       const positions = s.positions.filter((p) => p.id !== id)
       if (!position || exitPrice === null) {
         void deletePosition(id)
+        toast.error(`Closed ${position?.coin ?? 'position'} without a live price — nothing booked to the ledger.`)
         return { positions }
       }
       const pnl = pnlForPosition(position, exitPrice)
@@ -138,6 +140,10 @@ export const useAppStore = create<AppStore>((set) => ({
         reason,
       })
       void deletePosition(id)
+      const reasonLabel = reason === 'manual' ? 'Closed' : reason === 'stop_loss' ? 'Stop-loss hit' : 'Take-profit hit'
+      const message = `${reasonLabel}: ${position.side.toUpperCase()} ${position.coin} ${formatSignedUsd(pnl)}`
+      if (pnl >= 0) toast.success(message)
+      else toast.error(message)
       return { positions, realizedPnl: s.realizedPnl + pnl }
     }),
   updatePositionSlTp: (id, patch) =>

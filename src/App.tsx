@@ -1,3 +1,4 @@
+import { Toaster } from 'sonner'
 import { AiPanel } from './components/AiPanel'
 import { ChartPanel } from './components/ChartPanel'
 import { CommandPalette } from './components/CommandPalette'
@@ -34,6 +35,19 @@ function App() {
       </div>
       <StatusLine />
       <CommandPalette />
+      <Toaster
+        theme="dark"
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: 'var(--color-term-panel)',
+            border: '1px solid var(--color-term-border)',
+            borderRadius: '2px',
+            color: 'var(--color-term-muted)',
+            fontFamily: 'inherit',
+          },
+        }}
+      />
     </div>
   )
 }

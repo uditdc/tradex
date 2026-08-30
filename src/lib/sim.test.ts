@@ -3,6 +3,8 @@ import {
   checkSlTp,
   computePortfolio,
   computePositionVerdict,
+  formatSignedPct,
+  formatSignedUsd,
   livePriceForPosition,
   pnlForPosition,
   suggestionSideFromBias,
@@ -106,5 +108,33 @@ describe('computePortfolio', () => {
     const { equity, returnsPct } = computePortfolio(-500, -500, 10_000)
     expect(equity).toBe(9_000)
     expect(returnsPct).toBeCloseTo(-10)
+  })
+})
+
+describe('formatSignedUsd', () => {
+  it('prefixes a gain with +', () => {
+    expect(formatSignedUsd(12.3)).toBe('+$12.30')
+  })
+
+  it('prefixes a loss with - (not just relying on color)', () => {
+    expect(formatSignedUsd(-0.3)).toBe('-$0.30')
+  })
+
+  it('shows exactly zero with no sign', () => {
+    expect(formatSignedUsd(0)).toBe('$0.00')
+  })
+})
+
+describe('formatSignedPct', () => {
+  it('prefixes a gain with +', () => {
+    expect(formatSignedPct(2.5)).toBe('+2.50%')
+  })
+
+  it('prefixes a loss with -', () => {
+    expect(formatSignedPct(-10)).toBe('-10.00%')
+  })
+
+  it('shows exactly zero with no sign', () => {
+    expect(formatSignedPct(0)).toBe('0.00%')
   })
 })

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../store'
 import type { WsState } from '../store'
-import { computePortfolio, livePriceForPosition, pnlForPosition } from '../lib/sim'
+import { computePortfolio, formatSignedPct, formatSignedUsd, livePriceForPosition, pnlForPosition } from '../lib/sim'
 
 const WS_LABEL: Record<WsState, string> = {
   idle: 'IDLE',
@@ -56,18 +56,12 @@ export function StatusLine() {
         Equity <span className="text-term-amber">${equity.toFixed(2)}</span>
       </span>
       <span>
-        Returns{' '}
-        <span className={returnsPct >= 0 ? 'text-term-up' : 'text-term-down'}>
-          {returnsPct >= 0 ? '+' : ''}
-          {returnsPct.toFixed(2)}%
-        </span>
+        Returns <span className={returnsPct >= 0 ? 'text-term-up' : 'text-term-down'}>{formatSignedPct(returnsPct)}</span>
       </span>
       {positions.length > 0 && (
         <span>
           Unrealized{' '}
-          <span className={unrealizedPnl >= 0 ? 'text-term-up' : 'text-term-down'}>
-            {unrealizedPnl >= 0 ? '+' : ''}${Math.abs(unrealizedPnl).toFixed(2)}
-          </span>
+          <span className={unrealizedPnl >= 0 ? 'text-term-up' : 'text-term-down'}>{formatSignedUsd(unrealizedPnl)}</span>
         </span>
       )}
     </div>

@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { useAppStore } from '../store'
 import { useIndicators } from '../hooks/useIndicators'
-import { computePositionVerdict, livePriceForPosition, pnlForPosition, suggestionSideFromBias } from '../lib/sim'
+import { metaAndAssetCtxs } from '../lib/hl/rest'
+import {
+  computePositionVerdict,
+  formatSignedUsd,
+  livePriceForPosition,
+  pnlForPosition,
+  suggestionSideFromBias,
+} from '../lib/sim'
 import type { Verdict } from '../lib/sim'
 import type { SimPosition } from '../lib/storage/positions'
 
@@ -10,10 +17,6 @@ function biasClass(bias: string): string {
   if (lower.includes('long')) return 'text-term-up'
   if (lower.includes('short')) return 'text-term-down'
   return 'text-term-muted'
-}
-
-function fmtUsd(n: number): string {
-  return `${n >= 0 ? '+' : ''}$${Math.abs(n).toFixed(2)}`
 }
 
 export function AiPanel() {
@@ -35,6 +38,7 @@ export function AiPanel() {
 
   const [rationaleExpanded, setRationaleExpanded] = useState(false)
   const [verdicts, setVerdicts] = useState<Record<number, Verdict | { verdict: string; note: string }>>({})
+  const [closingIds, setClosingIds] = useState<Set<number>>(new Set())
 
   const read = aiReadCache[`${coin}:${interval}`] ?? null
   const activePrice = candles.length > 0 ? candles[candles.length - 1].close : null
@@ -88,7 +92,30 @@ export function AiPanel() {
   })
   const totalPnl = positionRows.reduce((sum, r) => sum + (r.pnl ?? 0), 0)
 
-  function handleClose(position: SimPosition, exitPrice: number | null) {
+  /**
+   * Closes a position at the live price if one's already available (active coin or
+   * watchlist). Otherwise — a position on a coin that's neither, e.g. after
+   * switching away and forgetting about it — fetches a one-off real price so a
+   * manual close always books real realized PnL instead of silently dropping the
+   * position with nothing booked to the ledger.
+   */
+  async function handleClose(position: SimPosition, liveCur: number | null) {
+    let exitPrice = liveCur
+    if (exitPrice === null) {
+      setClosingIds((prev) => new Set(prev).add(position.id))
+      try {
+        const ctx = await metaAndAssetCtxs(position.coin)
+        exitPrice = ctx.markPx
+      } catch (err) {
+        console.error(`Failed to fetch a close price for ${position.coin}:`, err)
+      } finally {
+        setClosingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(position.id)
+          return next
+        })
+      }
+    }
     closePosition(position.id, exitPrice, 'manual')
   }
 
@@ -308,8 +335,13 @@ export function AiPanel() {
                 </span>
                 <span className="border-term-violet text-term-violet rounded-sm border px-1 text-[9px]">SIM</span>
               </span>
-              <button type="button" onClick={() => handleClose(position, cur)} className="text-term-muted text-xs">
-                ✕
+              <button
+                type="button"
+                onClick={() => void handleClose(position, cur)}
+                disabled={closingIds.has(position.id)}
+                className="border-term-border text-term-muted hover:border-term-amber hover:text-term-amber rounded-sm border px-1.5 py-0.5 text-[10px] tracking-wide uppercase disabled:opacity-40"
+              >
+                {closingIds.has(position.id) ? '...' : 'Close'}
               </button>
             </div>
             <div className="flex justify-between">
@@ -319,7 +351,7 @@ export function AiPanel() {
               <span
                 className={`text-sm font-semibold ${pnl === null ? 'text-term-muted' : pnl >= 0 ? 'text-term-up' : 'text-term-down'}`}
               >
-                {pnl === null ? '—' : fmtUsd(pnl)}
+                {pnl === null ? '—' : formatSignedUsd(pnl)}
               </span>
             </div>
             <div className="flex items-center gap-3 text-[10px]">
@@ -369,7 +401,7 @@ export function AiPanel() {
       {positions.length > 0 && (
         <div className="text-term-muted flex justify-between border-t border-t-[color:var(--color-term-border)] pt-2 text-xs tracking-widest uppercase">
           <span>Sim P&amp;L</span>
-          <span className={totalPnl >= 0 ? 'text-term-up' : 'text-term-down'}>{fmtUsd(totalPnl)}</span>
+          <span className={totalPnl >= 0 ? 'text-term-up' : 'text-term-down'}>{formatSignedUsd(totalPnl)}</span>
         </div>
       )}
     </div>
