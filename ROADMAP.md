@@ -777,18 +777,34 @@ Notes:
   in this store already behaves — the safety property is "off by default on a
   fresh install," not "never resumes automatically." Worth reconsidering if an
   always-resuming bot turns out to surprise people in practice.
-- **Missing-key behavior verified live:** without `TYPESAFE_API_KEY` set (real
-  state right now — the key must be added to `server/.env` by whoever runs this),
-  `/api/bot-decision` returns a clear 503 instead of crashing the server (unlike
-  the required `LLM_API_KEY`/`LLM_MODEL`, which still throw at startup). Toggling
-  the bot on in a real browser correctly showed "Waiting for the next 1m close...",
-  fired a real request with the real live `IndicatorDict` as `state` once a 1m bar
-  closed, and surfaced the 503 as a single toast (deduped via a ref so it doesn't
-  re-toast every 15s while the key stays unconfigured) — confirms every layer of
-  the pipeline except the actual Jev call itself, which needs a real key to verify.
-  **This is the one thing still unverified end-to-end** — worth a real pass once a
-  `TYPESAFE_API_KEY` is available, to confirm actual decision quality/latency, not
-  just that the plumbing is correct.
+- **Missing-key behavior verified live** (before a real key existed): without
+  `TYPESAFE_API_KEY` set, `/api/bot-decision` returns a clear 503 instead of
+  crashing the server (unlike the required `LLM_API_KEY`/`LLM_MODEL`, which still
+  throw at startup); toggling the bot on correctly showed "Waiting for the next 1m
+  close...", fired a real request, and surfaced the 503 as one deduped toast.
+- **Real key added; the actual Jev call verified end-to-end, live, twice:** (1)
+  direct `curl` calls against `/api/bot-decision` with hand-built but
+  realistic-shaped indicator payloads got genuine, well-calibrated judgments back —
+  a clean bullish-trend setup (rising EMA stack, RSI 68, high volume, trending
+  regime) returned `buy` at 0.79 confidence (probabilities: buy 0.86); a bearish
+  setup against a losing held long returned `sell` at 0.79 (probabilities: sell
+  0.86); a choppy/ranging setup returned `hold` at only 0.23 (probabilities spread
+  across hold 0.49/sell 0.46) — the low-confidence case is exactly what
+  `decideBotAction`'s 0.6 threshold exists to catch. (2) In a real browser with the
+  bot toggled on against live HYPE data: watched three consecutive real decision
+  cycles over ~3 minutes (one per 1m close), each a real Jev response
+  (confidence 0.27–0.45, all below threshold), each correctly resulting in *no*
+  paper position opened (`positions`/`ledger` counts stayed at 0 in IndexedDB the
+  whole time) — proving the confidence gate holds up over repeated real cycles, not
+  just one lucky/unlucky call. The bot's live decision also correctly drove the "AI
+  Trade Suggestion" card's side (`SHORT HYPE`) even while withholding auto-execution,
+  confirming the "replace predictive analysis" display wiring separately from the
+  execution wiring. Did not additionally chase a live auto-open/auto-flip in the
+  browser (would need a naturally-occurring ≥0.6 confidence moment or synthetic
+  data injected into a real WS-driven session) — that exact code path is already
+  covered by 6 unit tests plus the direct `curl` proof that a ≥0.6 response
+  triggers `open`/`close_and_flip`, and the open/close mechanics themselves were
+  already proven live in Phases 9–11.
 - SDK confirmed directly against its shipped `.d.ts` (`@typesafe-ai/sdk@0.6.0`)
   rather than only the docs site, after two research-subagent attempts returned
   unusable placeholder text instead of real findings — fetched
