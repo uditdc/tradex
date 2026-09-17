@@ -9,14 +9,11 @@ import {
   CommandList,
   CommandSeparator,
 } from './ui/command'
-import { triggerAsk } from '../hooks/useAsk'
 import { INTERVAL_MS } from '../lib/hl/intervals'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
 
 const INTERVALS = Object.keys(INTERVAL_MS)
-
-type Mode = 'command' | 'ask'
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false
@@ -25,8 +22,6 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<Mode>('command')
-  const [askQuery, setAskQuery] = useState('')
   const coin = useAppStore((s) => s.coin)
   const interval = useAppStore((s) => s.interval)
   const setCoinInterval = useAppStore((s) => s.setCoinInterval)
@@ -37,12 +32,6 @@ export function CommandPalette() {
       const isPaletteShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
       if ((e.key === ':' || isPaletteShortcut) && !isTypingTarget(e.target)) {
         e.preventDefault()
-        setMode('command')
-        setOpen(true)
-      } else if (e.key === '/' && !isTypingTarget(e.target)) {
-        e.preventDefault()
-        setMode('ask')
-        setAskQuery('')
         setOpen(true)
       }
     }
@@ -53,33 +42,6 @@ export function CommandPalette() {
   function select(nextCoin: string, nextInterval: string) {
     setCoinInterval(nextCoin, nextInterval)
     setOpen(false)
-  }
-
-  function submitAsk() {
-    const question = askQuery.trim()
-    if (!question) return
-    setOpen(false)
-    void triggerAsk(question)
-  }
-
-  if (mode === 'ask') {
-    return (
-      <CommandDialog open={open} onOpenChange={setOpen} title="Ask the AI" description="Ask a question about this market">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Ask about this market... (Enter to send)"
-            value={askQuery}
-            onValueChange={setAskQuery}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                submitAsk()
-              }
-            }}
-          />
-        </Command>
-      </CommandDialog>
-    )
   }
 
   return (

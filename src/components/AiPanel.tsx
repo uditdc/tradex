@@ -15,7 +15,6 @@ function secondsToNextMinute(now: number): number {
 
 export function AiPanel() {
   const coin = useAppStore((s) => s.coin)
-  const askState = useAppStore((s) => s.askState)
   const simSizeUsd = useAppStore((s) => s.simSizeUsd)
   const simLeverage = useAppStore((s) => s.simLeverage)
   const setSimSizeUsd = useAppStore((s) => s.setSimSizeUsd)
@@ -125,20 +124,6 @@ export function AiPanel() {
           </div>
         )}
       </div>
-
-      {askState && (
-        <div className="border-term-border flex flex-col gap-1 border-b pb-3">
-          <span className="text-term-muted text-[11px] tracking-widest uppercase">Ask</span>
-          <p className="text-term-amber text-sm">{askState.question}</p>
-          {askState.status === 'error' ? (
-            <p className="text-term-down text-sm">{askState.error}</p>
-          ) : askState.status === 'loading' ? (
-            <p className="text-term-muted text-sm">Thinking...</p>
-          ) : (
-            <p className="text-term-muted text-sm whitespace-pre-wrap">{askState.text}</p>
-          )}
-        </div>
-      )}
     </div>
   )
 }

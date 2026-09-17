@@ -1,7 +1,6 @@
 import { toast } from 'sonner'
 import { create } from 'zustand'
 import type { BotDecisionResult } from '../lib/ai/bot'
-import type { AskState, LogEntry } from '../lib/ai/types'
 import type { Candle, MarketCtx } from '../lib/hl/types'
 import type { ConnectionStatus } from '../lib/hl/ws'
 import type { Bias, Regime } from '../lib/indicators/types'
@@ -14,7 +13,6 @@ import type { SimPosition } from '../lib/storage/positions'
 export type WsState = ConnectionStatus | 'idle'
 export type { SimPosition }
 
-const MAX_LOG_ENTRIES = 200
 const MAX_BOT_LOG_ENTRIES = 200
 
 const CLOSE_REASON_LABELS: Record<CloseReason, string> = {
@@ -54,10 +52,6 @@ interface AppStore {
   /** Bumped whenever a candle buffer closes a bar. */
   lastBarCloseAt: number | null
 
-  askState: AskState | null
-  /** Capped ring buffer of every "/" ask this session, for the downloadable log. */
-  readLog: LogEntry[]
-
   /** Background-polled watchlist snapshot, keyed by coin. */
   watchlistData: Record<string, WatchlistEntry>
 
@@ -84,8 +78,6 @@ interface AppStore {
   setLastUpdate: (lastUpdate: number) => void
   setLatencyMs: (latencyMs: number) => void
   setLastBarCloseAt: (lastBarCloseAt: number) => void
-  setAskState: (state: AskState | null) => void
-  addLogEntry: (entry: LogEntry) => void
   setWatchlistEntry: (coin: string, entry: WatchlistEntry) => void
   setBotStatus: (coin: string, status: BotStatus) => void
   addBotLogEntry: (entry: BotLogEntry) => void
@@ -117,8 +109,6 @@ export const useAppStore = create<AppStore>((set) => ({
   lastUpdate: null,
   latencyMs: null,
   lastBarCloseAt: null,
-  askState: null,
-  readLog: [],
   watchlistData: {},
   botStatus: {},
   botLog: [],
@@ -136,8 +126,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setLastUpdate: (lastUpdate) => set({ lastUpdate }),
   setLatencyMs: (latencyMs) => set({ latencyMs }),
   setLastBarCloseAt: (lastBarCloseAt) => set({ lastBarCloseAt }),
-  setAskState: (askState) => set({ askState }),
-  addLogEntry: (entry) => set((s) => ({ readLog: [...s.readLog, entry].slice(-MAX_LOG_ENTRIES) })),
   setWatchlistEntry: (coin, entry) => set((s) => ({ watchlistData: { ...s.watchlistData, [coin]: entry } })),
   setBotStatus: (coin, status) => set((s) => ({ botStatus: { ...s.botStatus, [coin]: status } })),
   addBotLogEntry: (entry) => set((s) => ({ botLog: [entry, ...s.botLog].slice(0, MAX_BOT_LOG_ENTRIES) })),

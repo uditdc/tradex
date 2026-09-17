@@ -9,15 +9,14 @@ selected coin/interval it shows live price data and a candle chart. No order exe
 position (entry/target/stop, live PnL against real price) for tracking a thesis — it
 never places, signs, or touches a real order.
 
-"Auto Mode" (off by default) is the core feature: TypeSafe's Jev model returns a fast
+"Auto Mode" (off by default) is the whole feature: TypeSafe's Jev model returns a fast
 typed buy/sell/hold judgment on the active coin's 1m closes, and a pure policy function
 (`decideBotAction` in `lib/sim.ts`, no confidence gate by default — it acts on every
 real decision, `hold` is itself the "don't trade" signal) turns that into open/close
 calls against the paper-trading engine. Every decision is logged (the Jev call log) and
-every close is booked to a realized-PnL ledger (trade history, session PnL). A manual
-"/" ask-the-AI mode (a normal narrative LLM completion, not Jev) is still available for
-free-form questions about the current market — there is no automatic narrative "AI
-read" anymore; that feature was removed in favor of the bot.
+every close is booked to a realized-PnL ledger (trade history, session PnL). There is no
+other AI provider in this app — no narrative LLM, no "AI read," no "/" ask mode; those
+were removed. Jev (`/api/bot-decision`) is the only model call this app ever makes.
 
 Indicators (bias, RSI, ATR%, volume ratio, swing support/resistance, regime — see
 "Indicator block (v1 scope)") are still computed deterministically every tick; there is
@@ -42,21 +41,18 @@ stop-loss/take-profit (nearest swing support/resistance).
 - Tailwind + shadcn/ui (Command/cmdk for the command palette, Card, Badge, Table,
   Skeleton, Sonner for toasts)
 - `lightweight-charts` for the candle panel
-- Tiny Node backend (Hono) with a few jobs only: complete `/api/ask` (narrative LLM,
-  key stays server-side), `/api/bot-decision` (Jev), and proxy Hyperliquid REST if
-  the browser hits CORS trouble. Try direct browser calls to the info endpoint
-  first; only add the proxy if actually needed.
-- LLM provider is OpenAI-compatible (currently OpenRouter — see `server/.env`'s
-  `LLM_API_KEY`/`LLM_BASE_URL`/`LLM_MODEL`), not Anthropic-specific. Swapping models
-  or providers later is a `server/.env` change, not a code change, as long as the
-  provider speaks the OpenAI chat-completions shape (OpenRouter does, for any model
-  it hosts, Anthropic's included). Only `/api/ask` uses it now.
-- `@typesafe-ai/sdk` (TypeSafe's Jev model) is a second, separate AI provider used
-  only for the trading bot's fast buy/sell/hold judgment (`/api/bot-decision`) — a
-  typed `choice()` call, not a narrative completion. Needs its own
-  `TYPESAFE_API_KEY` in `server/.env`; unlike `LLM_API_KEY` this one is optional at
-  startup (the bot is opt-in and off by default), so a missing key just disables
-  that one route with a clear error instead of blocking the server.
+- Tiny Node backend (Hono) with two jobs only: `/api/bot-decision` (Jev, key stays
+  server-side) and proxy Hyperliquid REST if the browser hits CORS trouble. Try
+  direct browser calls to the info endpoint first; only add the proxy if actually
+  needed.
+- `@typesafe-ai/sdk` (TypeSafe's Jev model) is the only AI provider in this app —
+  a typed `choice()` call (`/api/bot-decision`), not a narrative completion. Needs
+  `TYPESAFE_API_KEY` in `server/.env`; optional at startup (the bot is opt-in and
+  off by default), so a missing key just disables that one route with a clear
+  error instead of blocking the server. There used to be a second, OpenAI-compatible
+  narrative LLM provider (OpenRouter) behind `/api/read` and `/api/ask` — both
+  routes, and the LLM provider entirely, were removed; Jev is the only model call
+  this app makes now.
 - WebSocket to Hyperliquid straight from the browser
 - `vitest` for tests, indicators fully covered
 
@@ -66,15 +62,14 @@ stop-loss/take-profit (nearest swing support/resistance).
 src/
   lib/hl/          # REST snapshot, WS candle subscription, candle buffer. No React.
   lib/indicators/  # Pure functions: candles in, numbers out. No I/O. Fully tested.
-  lib/ai/          # Context/client for /api/ask; bot.ts client for /api/bot-decision
+  lib/ai/bot.ts    # Client for /api/bot-decision (Jev) — the only AI call in the app
   lib/sim.ts       # Pure paper-position PnL/verdict/bot-policy helpers. No I/O. Tested.
   lib/storage/     # IndexedDB: paper positions, realized-PnL ledger (trade history)
-  hooks/           # useCandles, useIndicators, useAsk, useTradingBot, ...
+  hooks/           # useCandles, useIndicators, useTradingBot, ...
   components/      # TopBar, ChartPanel, AiPanel, PositionsBar, CommandPalette, Watchlist
   App.tsx
 server/
-  index.ts         # Hono: /api/ask (LLM), /api/bot-decision (TypeSafe), optional
-                    # /api/hl proxy
+  index.ts         # Hono: /api/bot-decision (TypeSafe), optional /api/hl proxy
 scripts/
   probe.ts         # tsx script: print candles + funding/OI for a coin, no UI
 ```
@@ -107,12 +102,6 @@ typed judgment, not a completion to strict-parse. `decideBotAction` (`lib/sim.ts
 the only place that turns it into an open/close call; keep policy (confidence
 gating, side-matching) there as plain code, not another model question.
 
-## Ask contract (`/api/ask`)
-
-Manual, user-initiated only (the "/" palette). Input: symbol, interval, last N candles
-(config, default 200), indicator dict, funding, OI, top-5 book levels, plus the user's
-question. Output: plain text, no JSON contract — shown as-is in the Ask panel.
-
 ## Design direction (locked — do not re-invent per session)
 
 Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-keyed.
@@ -130,8 +119,8 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
   chart+AI row, not squeezed into the narrow AI panel column. Panels are
   hairline-bordered, near-flat (rounded-sm), no shadows, no gradients.
 - Signature: the command palette. `:` or Cmd/Ctrl+K opens it (cmdk) for coin/interval
-  jumps, `/` opens it in ask-the-AI mode. Every action is reachable by keyboard; the
-  mouse is optional. Number keys 1–6 jump watchlist slots.
+  jumps. Every action is reachable by keyboard; the mouse is optional. Number keys
+  1–6 jump watchlist slots.
 - Motion: value-change flashes (amber tick, brief green/red on delta). Nothing else
   animates. Respect reduced motion.
 - shadcn components get restyled to these tokens in `index.css` theme variables once,
@@ -144,6 +133,6 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
 - Every phase ends with: `vitest` green, typecheck clean, `ROADMAP.md` box ticked plus a
   two-line note on what actually got built and anything surprising.
 - Never invent Hyperliquid API fields — fetch a real response and inspect it.
-- The LLM and TypeSafe API keys live in `server/.env` only. They must never reach the
-  client bundle.
+- The TypeSafe API key lives in `server/.env` only. It must never reach the client
+  bundle.
 - If a phase balloons, stop, split it in `ROADMAP.md`, and ask.

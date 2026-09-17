@@ -942,6 +942,26 @@ Notes:
   dashed green TP line at 80.40 — both prices and the live PnL figure matched the
   table below it exactly, and the 1m tab was highlighted as active without
   switching to it manually.
+- **Fourth follow-up: removed the "/" ask-the-AI feature entirely — only Jev calls
+  remain.** Prompted by asking who was calling `/api/ask` (answer: exactly one
+  caller, `CommandPalette`'s manual "/" mode — nothing automated) and a follow-up
+  to remove it outright. Deleted, not disabled: `/api/ask`, `ASK_SYSTEM_PROMPT`,
+  `requestCompletion`, and the `LLM_API_KEY`/`LLM_BASE_URL`/`LLM_MODEL` startup
+  check from `server/index.ts`; `src/hooks/useAsk.ts`, `src/lib/ai/client.ts`
+  (+ test), `src/lib/ai/context.ts` (+ test), `src/lib/ai/log.ts` (+ test),
+  `src/lib/ai/types.ts` entirely — `lib/ai/bot.ts` (the Jev client) doesn't import
+  from any of them, confirmed via grep before deleting, so nothing else broke.
+  `CommandPalette.tsx` lost its ask-mode branch, `mode`/`askQuery` state, and the
+  `/` key listener — it's coin/interval jump only now, same as before Phase 4 ever
+  added ask mode. `AiPanel`'s Ask display block and the store's
+  `askState`/`setAskState`/`readLog`/`addLogEntry` all removed along with it.
+  Also removed the now-dead `LLM_API_KEY`/`LLM_BASE_URL`/`LLM_MODEL` lines from
+  `server/.env` (untracked, local-only) — `TYPESAFE_API_KEY` is the only variable
+  the server reads now.
+- `pnpm typecheck` was clean immediately after the deletions with no leftover
+  references (confirmed via grep for every removed symbol across `src`/`server`
+  before calling it done) — `pnpm test`/`lint`/`build` all green after
+  (88 tests, down from 94; the ask/read-specific test files went with the code).
 
 ---
 
