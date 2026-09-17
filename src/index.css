@@ -137,6 +137,33 @@
   .pulse-glow { animation: none; }
 }
 
+@keyframes orb-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 color-mix(in oklab, var(--color-term-amber) 55%, transparent),
+      0 0 8px color-mix(in oklab, var(--color-term-amber) 50%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px color-mix(in oklab, var(--color-term-amber) 0%, transparent),
+      0 0 16px color-mix(in oklab, var(--color-term-amber) 90%, transparent);
+  }
+}
+/* Duration is set inline per-instance (faster while a Jev request is actually in flight). */
+.orb-pulse { animation: orb-pulse 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .orb-pulse { animation: none; }
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+.blink-cursor { animation: blink-cursor 1s step-end infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .blink-cursor { animation: none; }
+}
+
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;

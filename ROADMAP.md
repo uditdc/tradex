@@ -1036,6 +1036,45 @@ Notes:
 
 ---
 
+## Phase 17 — Imported design refresh: AI panel + tabbed activity bar
+- [x] Pulled `Tradex AI Pane.dc.html` from the linked claude.ai/design project
+  (`DesignSync.get_file`, project `5292a054-037d-45c9-9e49-3ff1b97a3462`) and
+  translated its layout intent into the existing token system (`text-term-*`,
+  `bg-term-panel`, etc.) rather than porting its inline hex styles or its DC
+  runtime (`support.js` — a prototyping harness, not something this app depends
+  on) verbatim.
+- [x] `AiPanel`: header now shows a glowing pulsing orb (amber, faster while a
+  decision request is actually in flight) next to "JEV · AUTO MODE" and a status
+  line with a blinking cursor (`paused · manual control` / `analyzing {coin}
+  1m…` / `watching {coin} 1m closes`) instead of the old static label — added a
+  real `botAnalyzing` store flag (`useTradingBot` sets it around the
+  `requestBotDecision` call) so this reflects an actual in-flight request, not
+  fabricated "thinking" text like the design mock's fake `thoughtScript` (that
+  part of the mock was deliberately not ported — this app doesn't stream
+  narrative Jev "thoughts", it never has).
+- [x] The countdown to the next 1m close is now an SVG ring (drains over 60s,
+  amber while analyzing, red in the last 8s, green otherwise) instead of a bare
+  `00:XX` text line.
+- [x] Scenario/action card: verdict text is bigger (`text-2xl`) with a
+  buy/sell/hold probability bar (segmented, colored) beneath it instead of three
+  bare percentage numbers.
+- [x] The "Why" factor rows gained a small segmented meter (5 segments for the
+  directional factors, 3 for conviction-only) alongside their existing
+  qualitative label, colored the same as the label.
+- [x] Replaced `PositionsBar` with `ActivityBar`: a single tabbed wide bar below
+  the chart+AI row (Positions / Trade History / Jev Call Log), Positions selected
+  by default per the request, instead of the old two-column
+  positions-next-to-history layout. The Jev call log moved here from the bottom
+  of `AiPanel` (which no longer renders a log at all) and gained a Scenario
+  column and a per-row confidence bar it didn't have before.
+- [x] `CLAUDE.md`'s component list and layout description updated for the
+  rename/restructure.
+- `pnpm typecheck`/`test` (88 passed, unchanged)/`lint`/`build` all green.
+- Not visually verified in a browser — no browser-automation tool was available
+  in this session. Static checks (full TS typecheck across all props/JSX, build)
+  pass, which rules out most wiring bugs, but layout/spacing should still get a
+  once-over from the user before calling this final.
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

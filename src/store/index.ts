@@ -59,6 +59,8 @@ interface AppStore {
   botStatus: Record<string, BotStatus>
   /** Every Jev decision this session, newest first, capped. */
   botLog: BotLogEntry[]
+  /** True only while a /api/bot-decision request is actually in flight. */
+  botAnalyzing: boolean
 
   /** Paper-trading simulator: open hypothetical positions and the size/leverage inputs for the next one. */
   positions: SimPosition[]
@@ -81,6 +83,7 @@ interface AppStore {
   setWatchlistEntry: (coin: string, entry: WatchlistEntry) => void
   setBotStatus: (coin: string, status: BotStatus) => void
   addBotLogEntry: (entry: BotLogEntry) => void
+  setBotAnalyzing: (botAnalyzing: boolean) => void
 
   openPosition: (input: Omit<SimPosition, 'id' | 'openedAt'>) => void
   /**
@@ -112,6 +115,7 @@ export const useAppStore = create<AppStore>((set) => ({
   watchlistData: {},
   botStatus: {},
   botLog: [],
+  botAnalyzing: false,
   positions: [],
   simSizeUsd: 5000,
   simLeverage: 5,
@@ -129,6 +133,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setWatchlistEntry: (coin, entry) => set((s) => ({ watchlistData: { ...s.watchlistData, [coin]: entry } })),
   setBotStatus: (coin, status) => set((s) => ({ botStatus: { ...s.botStatus, [coin]: status } })),
   addBotLogEntry: (entry) => set((s) => ({ botLog: [entry, ...s.botLog].slice(0, MAX_BOT_LOG_ENTRIES) })),
+  setBotAnalyzing: (botAnalyzing) => set({ botAnalyzing }),
 
   openPosition: (input) =>
     set((s) => {

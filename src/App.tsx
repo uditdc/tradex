@@ -1,8 +1,8 @@
 import { Toaster } from 'sonner'
+import { ActivityBar } from './components/ActivityBar'
 import { AiPanel } from './components/AiPanel'
 import { ChartPanel } from './components/ChartPanel'
 import { CommandPalette } from './components/CommandPalette'
-import { PositionsBar } from './components/PositionsBar'
 import { StatusLine } from './components/StatusLine'
 import { TopBar } from './components/TopBar'
 import { Watchlist } from './components/Watchlist'
@@ -35,7 +35,7 @@ function App() {
           </div>
           <AiPanel />
         </div>
-        <PositionsBar />
+        <ActivityBar />
       </div>
       <StatusLine />
       <CommandPalette />

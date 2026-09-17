@@ -66,7 +66,7 @@ src/
   lib/sim.ts       # Pure paper-position PnL/verdict/bot-policy helpers. No I/O. Tested.
   lib/storage/     # IndexedDB: paper positions, realized-PnL ledger (trade history)
   hooks/           # useCandles, useIndicators, useTradingBot, ...
-  components/      # TopBar, ChartPanel, AiPanel, PositionsBar, CommandPalette, Watchlist
+  components/      # TopBar, ChartPanel, AiPanel, ActivityBar, CommandPalette, Watchlist
   App.tsx
 server/
   index.ts         # Hono: /api/bot-decision (TypeSafe), optional /api/hl proxy
@@ -136,10 +136,11 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
 - Type: JetBrains Mono everywhere. Data at `text-sm` with `tabular-nums`; labels
   uppercase `text-[11px] tracking-widest` muted. No display font, no hero anything.
 - Layout: fixed viewport grid, no page scroll. Top bar / watchlist / (center chart +
-  right AI panel) row / full-width positions+trade-history bar / bottom status
-  line. Positions and trade history are deliberately their own wide bar below the
-  chart+AI row, not squeezed into the narrow AI panel column. Panels are
-  hairline-bordered, near-flat (rounded-sm), no shadows, no gradients.
+  right AI panel) row / full-width tabbed activity bar / bottom status line.
+  `ActivityBar` is deliberately its own wide bar below the chart+AI row, not
+  squeezed into the narrow AI panel column — it tabs between Positions (default
+  tab), Trade History, and the Jev call log rather than showing them all at once.
+  Panels are hairline-bordered, near-flat (rounded-sm), no shadows, no gradients.
 - Signature: the command palette. `:` or Cmd/Ctrl+K opens it (cmdk) for coin/interval
   jumps. Every action is reachable by keyboard; the mouse is optional. Number keys
   1–6 jump watchlist slots.

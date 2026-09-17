@@ -52,11 +52,20 @@ export function useTradingBot(): void {
 
         const indicators = computeAll(candles)
         const activePrice = latest.close
-        const { positions, openPosition, closePosition, setBotStatus, addBotLogEntry, simSizeUsd, simLeverage } =
-          useAppStore.getState()
+        const {
+          positions,
+          openPosition,
+          closePosition,
+          setBotStatus,
+          addBotLogEntry,
+          setBotAnalyzing,
+          simSizeUsd,
+          simLeverage,
+        } = useAppStore.getState()
         const held = positions.find((p) => p.coin === coin) ?? null
 
         let result
+        setBotAnalyzing(true)
         try {
           result = await requestBotDecision(
             coin,
@@ -70,6 +79,8 @@ export function useTradingBot(): void {
             toast.error(`Trading bot: ${message}`)
           }
           return
+        } finally {
+          setBotAnalyzing(false)
         }
         lastErrorToastedRef.current = false
         if (cancelled) return
