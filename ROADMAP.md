@@ -965,7 +965,47 @@ Notes:
 
 ---
 
+## Phase 15 — Split Jev's judgment: ticker scenario vs. per-trade action
+- [x] `/api/bot-decision` now asks two independent Jev `choice()` questions in the
+  same call over the same state: `scenario` (`"bull" | "bear" | "neutral"` — is
+  this coin worth trading at all, regardless of any position) and `action`
+  (`"buy" | "sell" | "hold"` — what to do with the currently held position on it,
+  unchanged in meaning from before). Both shaped `{ choice, confidence,
+  probabilities }`.
+- [x] `decideBotAction` (`lib/sim.ts`) still keys only off `action` — `scenario` is
+  display-only for now, per the request to keep a single trade per ticker and let
+  the existing per-ticker buy/sell/hold keep deciding the trade. `scenario` sets up
+  for a later step (parking lot) where it could gate which tickers even get
+  evaluated once multiple concurrent trades per ticker exist.
+- [x] `AiPanel` shows a "Scenario" line (BULL/BEAR/NEUTRAL, confidence) above the
+  existing action block, and the Jev call log now shows both per entry (e.g.
+  `BULL BUY 92%`), colored the same green/red/muted as everywhere else PnL
+  direction is shown (bull=up, bear=down, neutral=muted) — no new violet
+  AI-accent color introduced, since this is a directional call like buy/sell, not
+  a position verdict.
+- Verified against the real TypeSafe API key (temporarily started just
+  `dev:server` — the user's own dev server wasn't running at the time — killed it
+  again immediately after): a bullish indicator set on HYPE with no open position
+  returned `scenario: bull (100%)` / `action: buy (92%)`; a bearish indicator set
+  on BTC with an open losing long returned `scenario: bear (99%)` / `action: sell
+  (83%)` — sensible and independent of each other, e.g. `action` responding to the
+  held position's side while `scenario` stayed a pure read on the indicators.
+- `pnpm typecheck`/`test` (88 passed, unchanged — `decideBotAction`'s own tests
+  didn't need touching since its signature didn't change)/`lint`/`build` all green.
+- Deliberately not built yet: multiple concurrent open trades per ticker (single
+  trade per ticker still holds — see parking lot).
+
+---
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)
 - Multi-coin Auto Mode (currently trades only whichever coin is active)
+- Multiple concurrent open trades per ticker, each with its own `action` judgment
+  (Phase 15 laid the groundwork: `scenario` is already ticker-level and separate
+  from `action`) — would also let `scenario` gate which tickers get evaluated at
+  all instead of being display-only
+- Persistent (server-side, UI-independent) trading sessions — the loop currently
+  only runs while a browser tab has the app mounted (see `useTradingBot`); moving
+  it server-side needs its own durable storage (IndexedDB isn't reachable from
+  Node) — raised, not started

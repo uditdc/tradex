@@ -77,7 +77,7 @@ export function useTradingBot(): void {
         setBotStatus(coin, { ...result, timestamp: decidedAt })
         addBotLogEntry({ ...result, coin, timestamp: decidedAt })
 
-        const action = decideBotAction(result.decision, result.confidence, held?.side ?? null)
+        const action = decideBotAction(result.action.choice, result.action.confidence, held?.side ?? null)
         if (action.type === 'noop') return
 
         if (action.type === 'close_and_flip' && held) {

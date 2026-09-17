@@ -95,12 +95,23 @@ panel (see "What this is").
 ## Bot-decision contract (`/api/bot-decision`)
 
 Input: symbol, the full indicator dict, and — only if one exists — the currently held
-paper position on that coin (side, entry price, live unrealized PnL). Output: a single
-Jev `choice()` judgment — `decision` (`"buy" | "sell" | "hold"`), `confidence` (0–1),
-`probabilities` (per-option distribution). No prose, no parsing needed — this is a
-typed judgment, not a completion to strict-parse. `decideBotAction` (`lib/sim.ts`) is
-the only place that turns it into an open/close call; keep policy (confidence
-gating, side-matching) there as plain code, not another model question.
+paper position on that coin (side, entry price, live unrealized PnL). Output: two
+independent Jev `choice()` judgments asked in the same call over the same state —
+each shaped `{ choice, confidence, probabilities }`:
+
+- `scenario`: `"bull" | "bear" | "neutral"` — a ticker-level read on whether this
+  coin is worth considering for a trade at all, independent of any specific action.
+  Currently display-only (the AI panel's "Scenario" line and call log); it does not
+  yet gate `action`.
+- `action`: `"buy" | "sell" | "hold"` — the trade action for the (currently single)
+  open position on this coin. `decideBotAction` (`lib/sim.ts`) is the only place
+  that turns `action` into an open/close call; keep policy (confidence gating,
+  side-matching) there as plain code, not another model question.
+
+No prose, no parsing needed — these are typed judgments, not a completion to
+strict-parse. `scenario` and `action` are asked together (independent questions,
+same state) rather than as two separate requests, per TypeSafe's guidance on
+composing judgments.
 
 ## Design direction (locked — do not re-invent per session)
 

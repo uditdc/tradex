@@ -3,6 +3,7 @@ import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
 
 const BOT_DECISION_CLASS: Record<string, string> = { buy: 'text-term-up', sell: 'text-term-down', hold: 'text-term-muted' }
+const BOT_SCENARIO_CLASS: Record<string, string> = { bull: 'text-term-up', bear: 'text-term-down', neutral: 'text-term-muted' }
 
 function fmtClock(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-US', { hour12: false })
@@ -88,17 +89,28 @@ export function AiPanel() {
               <span className="text-term-amber">00:{String(secondsToNextMinute(now)).padStart(2, '0')}</span>
             </div>
             {botStatus ? (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-2">
                 <div className="flex items-baseline justify-between">
-                  <span className={`text-sm font-semibold uppercase ${BOT_DECISION_CLASS[botStatus.decision]}`}>
-                    {botStatus.decision} {coin}
+                  <span className="text-term-muted text-[10px] tracking-widest uppercase">Scenario</span>
+                  <span className={`text-xs font-semibold uppercase ${BOT_SCENARIO_CLASS[botStatus.scenario.choice]}`}>
+                    {botStatus.scenario.choice}{' '}
+                    <span className="text-term-muted font-normal">{Math.round(botStatus.scenario.confidence * 100)}%</span>
                   </span>
-                  <span className="text-term-muted text-xs tabular-nums">{Math.round(botStatus.confidence * 100)}%</span>
                 </div>
-                <div className="text-term-muted flex gap-2 text-[10px] tabular-nums">
-                  <span>buy {Math.round(botStatus.probabilities.buy * 100)}%</span>
-                  <span>sell {Math.round(botStatus.probabilities.sell * 100)}%</span>
-                  <span>hold {Math.round(botStatus.probabilities.hold * 100)}%</span>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-baseline justify-between">
+                    <span className={`text-sm font-semibold uppercase ${BOT_DECISION_CLASS[botStatus.action.choice]}`}>
+                      {botStatus.action.choice} {coin}
+                    </span>
+                    <span className="text-term-muted text-xs tabular-nums">
+                      {Math.round(botStatus.action.confidence * 100)}%
+                    </span>
+                  </div>
+                  <div className="text-term-muted flex gap-2 text-[10px] tabular-nums">
+                    <span>buy {Math.round(botStatus.action.probabilities.buy * 100)}%</span>
+                    <span>sell {Math.round(botStatus.action.probabilities.sell * 100)}%</span>
+                    <span>hold {Math.round(botStatus.action.probabilities.hold * 100)}%</span>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -115,8 +127,13 @@ export function AiPanel() {
                   <span className="text-term-muted">
                     {fmtClock(entry.timestamp)} {entry.coin}
                   </span>
-                  <span className={BOT_DECISION_CLASS[entry.decision]}>
-                    {entry.decision.toUpperCase()} {Math.round(entry.confidence * 100)}%
+                  <span className="flex items-center gap-1.5">
+                    <span className={BOT_SCENARIO_CLASS[entry.scenario.choice]}>
+                      {entry.scenario.choice.slice(0, 4).toUpperCase()}
+                    </span>
+                    <span className={BOT_DECISION_CLASS[entry.action.choice]}>
+                      {entry.action.choice.toUpperCase()} {Math.round(entry.action.confidence * 100)}%
+                    </span>
                   </span>
                 </div>
               ))}

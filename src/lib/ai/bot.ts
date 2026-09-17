@@ -1,11 +1,24 @@
 import type { IndicatorDict } from '../indicators/types'
 
 export type BotDecision = 'buy' | 'sell' | 'hold'
+export type BotScenario = 'bull' | 'bear' | 'neutral'
 
-export interface BotDecisionResult {
-  decision: BotDecision
+export interface Judgment<T extends string> {
+  choice: T
   confidence: number
-  probabilities: Record<BotDecision, number>
+  probabilities: Record<T, number>
+}
+
+/**
+ * Jev's per-tick output on a coin: a ticker-level scenario (is this coin worth
+ * considering for a trade at all) and a trade action (what to do with the — for
+ * now, single — open position on it). Two independent questions in one call so
+ * `scenario` can later gate which tickers get evaluated without changing how
+ * `action` drives a specific trade.
+ */
+export interface BotDecisionResult {
+  scenario: Judgment<BotScenario>
+  action: Judgment<BotDecision>
 }
 
 export interface BotPositionContext {

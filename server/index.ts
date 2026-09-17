@@ -19,6 +19,18 @@ app.post('/api/bot-decision', async (c) => {
     const { answers } = await typesafeClient.systemOne({
       state: { symbol, indicators, openPosition: position },
       questions: {
+        scenario: choice(
+          "Given this coin's current deterministic market indicators (EMA 9/21/55 stack, RSI 14, " +
+            "ATR% of price, volume ratio vs. its 20-bar average, nearest swing support/resistance, " +
+            'regime tag), what is the overall market scenario for this coin right now, independent of ' +
+            'any specific open position? This is a read on whether the coin is worth trading at all, ' +
+            'not a trade action.',
+          {
+            bull: 'Indicators favor upside — a reasonable environment to look for longs or hold existing longs.',
+            bear: 'Indicators favor downside — a reasonable environment to look for shorts or hold existing shorts.',
+            neutral: 'No clear directional edge right now — this coin is not worth trading; ignore it for now.',
+          },
+        ),
         action: choice(
           "Given this coin's current deterministic market indicators (EMA 9/21/55 stack, RSI 14, " +
             "ATR% of price, volume ratio vs. its 20-bar average, nearest swing support/resistance, " +
@@ -33,9 +45,16 @@ app.post('/api/bot-decision', async (c) => {
       },
     })
     return c.json({
-      decision: answers.action.choice,
-      confidence: answers.action.confidence,
-      probabilities: answers.action.probabilities,
+      scenario: {
+        choice: answers.scenario.choice,
+        confidence: answers.scenario.confidence,
+        probabilities: answers.scenario.probabilities,
+      },
+      action: {
+        choice: answers.action.choice,
+        confidence: answers.action.confidence,
+        probabilities: answers.action.probabilities,
+      },
     })
   } catch (err) {
     console.error('TypeSafe bot-decision request failed:', err)
