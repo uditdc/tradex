@@ -110,7 +110,7 @@ interface AppStore {
 
 export const useAppStore = create<AppStore>((set) => ({
   coin: 'HYPE',
-  interval: '1h',
+  interval: '1m',
   candles: [],
   marketCtx: null,
   wsStatus: 'idle',

@@ -1,8 +1,17 @@
-import { CandlestickSeries, type IChartApi, type ISeriesApi, type UTCTimestamp, createChart } from 'lightweight-charts'
+import {
+  CandlestickSeries,
+  type IChartApi,
+  type IPriceLine,
+  type ISeriesApi,
+  LineStyle,
+  type UTCTimestamp,
+  createChart,
+} from 'lightweight-charts'
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../store'
 import { INTERVAL_MS } from '../lib/hl/intervals'
 import type { Candle } from '../lib/hl/types'
+import { formatSignedUsd, pnlForPosition } from '../lib/sim'
 
 const INTERVALS = Object.keys(INTERVAL_MS)
 
@@ -44,7 +53,10 @@ export function ChartPanel() {
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const prevLengthRef = useRef(0)
+  const positionLinesRef = useRef<IPriceLine[]>([])
+  const coin = useAppStore((s) => s.coin)
   const candles = useAppStore((s) => s.candles)
+  const positions = useAppStore((s) => s.positions)
 
   useEffect(() => {
     const container = containerRef.current
@@ -100,6 +112,54 @@ export function ChartPanel() {
     }
     prevLengthRef.current = candles.length
   }, [candles])
+
+  useEffect(() => {
+    const series = seriesRef.current
+    if (!series) return
+
+    for (const line of positionLinesRef.current) series.removePriceLine(line)
+    positionLinesRef.current = []
+
+    const activePrice = candles.length > 0 ? candles[candles.length - 1].close : null
+    const openHere = positions.filter((p) => p.coin === coin)
+
+    for (const position of openHere) {
+      const pnl = activePrice !== null ? pnlForPosition(position, activePrice) : null
+      const sideColor = position.side === 'long' ? '#4ADE80' : '#F87171'
+
+      positionLinesRef.current.push(
+        series.createPriceLine({
+          price: position.entryPrice,
+          color: sideColor,
+          lineWidth: 2,
+          lineStyle: LineStyle.Solid,
+          title: `${position.side.toUpperCase()} ${pnl !== null ? formatSignedUsd(pnl) : '—'}`,
+        }),
+      )
+      if (position.takeProfit !== undefined) {
+        positionLinesRef.current.push(
+          series.createPriceLine({
+            price: position.takeProfit,
+            color: '#4ADE80',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            title: 'TP',
+          }),
+        )
+      }
+      if (position.stopLoss !== undefined) {
+        positionLinesRef.current.push(
+          series.createPriceLine({
+            price: position.stopLoss,
+            color: '#F87171',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            title: 'SL',
+          }),
+        )
+      }
+    }
+  }, [positions, coin, candles])
 
   return (
     <div className="flex h-full w-full flex-col">

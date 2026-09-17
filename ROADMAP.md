@@ -919,6 +919,29 @@ Notes:
   row, booked a real ledger entry (`TRADE HISTORY (0)` → `(1)`), and showed the
   same signed-PnL toast (`Closed: LONG HYPE +$65.41`) as before the table rewrite —
   confirming the structural change didn't regress the underlying close mechanics.
+- **Third follow-up: 1m default chart, positions drawn on the chart.**
+  `useAppStore`'s initial `interval` changed `'1h'` → `'1m'` (session-only state,
+  so this is a real default on every fresh load, not gated behind a persisted
+  config value). Left `useConfigStore`'s separate `defaultInterval` (used only by
+  `useWatchlist`'s background polling cadence) alone — a different "default," not
+  what was asked about.
+  `ChartPanel.tsx` gained a third price-line effect, same `createPriceLine`/
+  `removePriceLine` pattern the old key_levels feature used (Phase 4, removed in
+  this same Phase 14): for every open position on the *currently displayed* coin
+  (any interval — a price line doesn't care which timeframe you're looking at), it
+  draws a solid entry line (green/red by side) whose title is the side plus live
+  PnL (`LONG +$83.33`, recomputed from `pnlForPosition` against the chart's own
+  latest candle close), plus dashed TP/SL lines when set. Recomputed on every
+  candle tick (`[positions, coin, candles]`), same brute-force
+  remove-all-and-recreate approach as the old key_levels effect — cheap at the
+  scale of a handful of open positions, no need for the added complexity of
+  diffing/`applyOptions` updates.
+  Verified live: seeded a real position (same technique as the table verification
+  above, since there's no manual open button anymore), reloaded, and confirmed the
+  chart showed a solid green entry line at 79.50 labeled `LONG +$83.33` and a
+  dashed green TP line at 80.40 — both prices and the live PnL figure matched the
+  table below it exactly, and the 1m tab was highlighted as active without
+  switching to it manually.
 
 ---
 
