@@ -84,6 +84,10 @@ export function ChartPanel() {
       borderDownColor: '#F87171',
       wickUpColor: '#4ADE80',
       wickDownColor: '#F87171',
+      // Otherwise defaults to the last bar's up/down color, flipping green/red with the
+      // candle — a fixed light blue reads as "current price," distinct from direction.
+      priceLineColor: '#7DD3FC',
+      priceLineStyle: LineStyle.Dotted,
     })
     chartRef.current = chart
     prevLengthRef.current = 0
@@ -140,7 +144,9 @@ export function ChartPanel() {
         positionLinesRef.current.push(
           series.createPriceLine({
             price: position.takeProfit,
-            color: '#4ADE80',
+            // Amber, not up/down green — TP/SL are risk-boundary markers, not a long/short
+            // or price-direction signal, so they stay outside CLAUDE.md's up/down reservation.
+            color: '#E8B45A',
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
             title: 'TP',
@@ -151,7 +157,9 @@ export function ChartPanel() {
         positionLinesRef.current.push(
           series.createPriceLine({
             price: position.stopLoss,
-            color: '#F87171',
+            // Violet — same "AI-derived accent" family as the position-verdict pill; SL width
+            // itself comes from Jev's riskWidth score, not a fixed rule.
+            color: '#A78BFA',
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
             title: 'SL',

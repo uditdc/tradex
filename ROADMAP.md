@@ -1205,6 +1205,36 @@ Notes:
 - `pnpm typecheck`/`test` (100 passed, unchanged — this phase only moved
   existing JSX, no new logic)/`lint`/`build` all green.
 
+## Phase 22 — Non-directional chart colors for TP/SL and the live-price line
+- [x] `ChartPanel`'s take-profit price line was `#4ADE80` (the same green as
+  `term-up`) and stop-loss was `#F87171` (`term-down`) — reusing the
+  long/short–up/down reservation `CLAUDE.md` explicitly locks to actual
+  direction semantics for something that isn't one (TP/SL are risk-boundary
+  markers, not a price-direction signal). Switched TP to amber (`#E8B45A`,
+  same "emphasized live value" meaning it has everywhere else) and SL to
+  violet (`#A78BFA`, extending the existing "AI-generated accent" meaning —
+  SL's distance from entry comes from Jev's `riskWidth` score, not a fixed
+  rule). The entry-price line keeps its side color (green long / red short)
+  since that *is* a legitimate long/short semantic.
+- [x] The chart's live/last-price line (lightweight-charts' built-in
+  `priceLineColor`) had no explicit color, so it defaulted to the last
+  candle's up/down color — flipping green/red with every bar and fighting
+  the same up/down reservation. Set it to a new light-blue token, `#7DD3FC`,
+  documented in `CLAUDE.md`'s palette alongside the other two changes.
+- [x] `CLAUDE.md`'s palette bullet rewritten to document all three colors and
+  *why* — the reasoning (not just the hex) is what keeps this from being
+  re-litigated next session.
+- Also fixed two typecheck errors in `AiPanel.tsx` from an in-progress
+  hand-edit already on disk when this phase started (compacting the header
+  into one line — strategy + elapsed time inline, "Start"/"End" instead of
+  "Start Session"/"End Session", the separate status-text line removed) —
+  kept that layout change as the user had it, just made the elapsed-time
+  read null-safely and deleted the now-dead commented-out old status block
+  per the user's own no-commented-code rule.
+- `pnpm typecheck`/`test` (100 passed, unchanged)/`lint`/`build` all green.
+- Not visually verified in a browser — no browser-automation tool available
+  this session (same limitation as Phases 17, 20, 21).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

@@ -154,12 +154,6 @@ export function AiPanel() {
   }
 
   const seconds = secondsToNextMinute(now)
-  const statusText = !botEnabled
-    ? 'paused · manual control'
-    : botAnalyzing
-      ? `analyzing ${coin} 1m…`
-      : `watching ${coin} 1m closes`
-  const statusClass = !botEnabled ? 'text-term-muted' : botAnalyzing ? 'text-term-amber' : 'text-term-up'
 
   return (
     <div className="border-term-border bg-term-panel flex w-80 shrink-0 flex-col overflow-y-auto border-l">
@@ -172,15 +166,9 @@ export function AiPanel() {
           <span className="text-[11px] font-semibold tracking-widest text-[#F5F0E6]">
             JEV{' '}
             <span className="text-term-muted font-normal">
-              · AUTO MODE · {STRATEGIES.find((s) => s.id === activeStrategy)?.label.toUpperCase()}
+              · {STRATEGIES.find((s) => s.id === activeStrategy)?.label.toUpperCase()}
+              {sessionStartedAt !== null && <> · {formatElapsed(now - sessionStartedAt)}</>}
             </span>
-          </span>
-          <span className={`flex items-center gap-1 text-[10px] ${statusClass}`}>
-            {statusText}
-            {botEnabled && sessionStartedAt !== null && (
-              <span className="text-term-muted tabular-nums">· {formatElapsed(now - sessionStartedAt)}</span>
-            )}
-            <span className="blink-cursor">▌</span>
           </span>
         </div>
         <button
@@ -198,7 +186,7 @@ export function AiPanel() {
             botEnabled ? 'border-term-amber text-term-amber' : 'border-term-border text-term-muted hover:border-term-amber hover:text-term-amber'
           }`}
         >
-          {botEnabled ? 'End Session' : 'Start Session'}
+          {botEnabled ? 'End' : 'Start'}
         </button>
       </div>
 

@@ -197,9 +197,16 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
 
 - Palette: `#0B0D10` background, `#14181D` panel, `#2A313A` hairline borders,
   `#E8B45A` amber for live data and emphasis, `#9AA4B2` muted labels,
-  `#4ADE80` / `#F87171` strictly for long/short–up/down semantics, never decoration,
-  `#A78BFA` violet reserved for AI-generated accents (position verdicts) so they
-  read as distinct from live market data.
+  `#4ADE80` / `#F87171` strictly for long/short–up/down semantics, never decoration
+  (this rules them out for TP/SL chart lines too — those are risk-boundary
+  markers, not a direction signal), `#A78BFA` violet reserved for AI-generated
+  accents (position verdicts, and — since Jev's `riskWidth` score sets its
+  distance — the stop-loss chart line) so they read as distinct from live
+  market data, `#7DD3FC` light blue for the chart's live/last-price line
+  (`ChartPanel`'s `priceLineColor`; without it lightweight-charts defaults to
+  the last candle's up/down color, which would fight the up/down reservation
+  above) and nothing else. The take-profit chart line uses amber, same as
+  everywhere else amber marks an emphasized live value.
 - Type: JetBrains Mono everywhere. Data at `text-sm` with `tabular-nums`; labels
   uppercase `text-[11px] tracking-widest` muted. No display font, no hero anything.
 - Layout: fixed viewport grid, no page scroll. Top bar / watchlist / (center chart +
