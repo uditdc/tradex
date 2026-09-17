@@ -1235,6 +1235,35 @@ Notes:
 - Not visually verified in a browser — no browser-automation tool available
   this session (same limitation as Phases 17, 20, 21).
 
+## Phase 23 — Response-anchored countdown; persisted Jev call log
+- [x] The "Next Jev analysis" countdown ring was purely `60 - (now % 60)` —
+  wall-clock-anchored, so it reset on every minute boundary regardless of
+  whether a Jev call actually happened or completed that minute (e.g. a
+  skipped poll before `MIN_CANDLES` bars exist, or an in-flight request
+  running past the boundary). New `lastDecisionAt` in `useAppStore`, set in
+  `useTradingBot`'s `finally` block (runs on both the success path and the
+  early `return` in `catch` — success or failure, either way) instead of
+  only on success. `AiPanel`'s countdown now counts down from 60 anchored to
+  `lastDecisionAt` (falling back to `sessionStartedAt` before the first
+  response ever lands), so it only resets on an actual settled response.
+  Clamps at 0 rather than going negative if a response is overdue.
+- [x] The Jev call log (`botLog`) was in-memory only — a page refresh
+  cleared it even though positions and the trade-history ledger already
+  survived one. New `lib/storage/botLog.ts` (IndexedDB, `fake-indexeddb`-
+  tested, same shape as `ledger.ts`/`positions.ts`) plus `usePersistedBotLog`
+  (mounted in `App.tsx` alongside the other `usePersisted*` hooks). The
+  store's `addBotLogEntry` action now persists as a side effect (matching
+  how `openPosition`/`closePosition` already do their own persistence
+  inline) instead of needing a separate call site. Hydration re-applies the
+  existing 200-entry in-memory cap (`MAX_BOT_LOG_ENTRIES`, now exported);
+  the durable IndexedDB store itself is left unbounded, same as the ledger.
+  `botStatus` (latest decision per coin) deliberately stays unpersisted — it
+  self-heals from the next poll within a session's normal 1m cadence.
+- Not visually verified in a browser — no browser-automation tool available
+  this session (same limitation as Phases 17, 20, 21, 22).
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 103 passed (3 new
+  for `botLog.ts`'s add/get round-trip and ordering).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

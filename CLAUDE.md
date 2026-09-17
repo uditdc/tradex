@@ -76,7 +76,7 @@ src/
   lib/ai/bot.ts        # Client for /api/bot-decision (Jev) — the only AI call in the app
   lib/sim.ts           # Pure paper-position PnL/verdict/bot-policy helpers. No I/O. Tested.
   lib/closePosition.ts # resolveClosePrice: live price, else a one-off Hyperliquid fetch. I/O, not pure.
-  lib/storage/         # IndexedDB: paper positions, realized-PnL ledger (trade history)
+  lib/storage/         # IndexedDB: paper positions, realized-PnL ledger, Jev call log
   hooks/               # useCandles, useIndicators, useTradingBot, ...
   components/          # TopBar, ChartPanel, AiPanel, ActivityBar, CommandPalette, Watchlist
   App.tsx
@@ -94,7 +94,11 @@ scripts/
 - One store (zustand) holds: coin, interval, candle buffer, indicator dict, the
   paper-trading simulator's positions, the trading bot's latest decision per coin
   plus its running call log, and the realized-PnL ledger (trade history) with
-  session-only and all-time PnL totals.
+  session-only and all-time PnL totals. Positions, the ledger, and the call log are
+  each mirrored to IndexedDB (`lib/storage/`) and hydrated once on startup
+  (`usePersisted*` hooks in `App.tsx`) so a page refresh doesn't drop them —
+  `botStatus` (latest decision per coin) is the one exception, left to repopulate
+  itself from the next poll instead.
 
 ## Indicator block (v1 scope)
 

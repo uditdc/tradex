@@ -72,6 +72,7 @@ export function useTradingBot(): void {
           setBotStatus,
           addBotLogEntry,
           setBotAnalyzing,
+          setLastDecisionAt,
           simSizeUsd,
           simLeverage,
         } = useAppStore.getState()
@@ -95,7 +96,11 @@ export function useTradingBot(): void {
           }
           return
         } finally {
+          // Runs on both the success path and the early `return` above — the countdown
+          // ring (`AiPanel`) resets on any settled response, success or failure, not on
+          // a wall-clock minute boundary.
           setBotAnalyzing(false)
+          setLastDecisionAt(Date.now())
         }
         lastErrorToastedRef.current = false
         if (cancelled) return

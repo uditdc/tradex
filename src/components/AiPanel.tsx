@@ -31,9 +31,16 @@ const CONVICTION_LABELS = ['Low', 'Moderate', 'High']
 const RING_RADIUS = 17
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
-/** Seconds left until the next wall-clock minute boundary — when `useTradingBot` next polls a closed 1m bar. */
-function secondsToNextMinute(now: number): number {
-  return 60 - (Math.floor(now / 1000) % 60)
+/**
+ * Seconds left on the "Next Jev analysis" countdown, counting down from 60. Anchored
+ * to the last /api/bot-decision response (success or failure — `lastDecisionAt`),
+ * falling back to session start before the first response ever lands, so the ring
+ * only resets on an actual response, never just on a wall-clock minute boundary.
+ * Clamps at 0 (not negative) if a response is overdue.
+ */
+function secondsUntilNextDecision(now: number, anchor: number | null): number {
+  if (anchor === null) return 60
+  return Math.max(0, 60 - Math.floor((now - anchor) / 1000))
 }
 
 /** `12:34` or `1:02:03` — how long the current session has been running. */
@@ -116,6 +123,7 @@ export function AiPanel() {
   const setSimLeverage = useAppStore((s) => s.setSimLeverage)
   const botStatus = useAppStore((s) => s.botStatus[coin])
   const botAnalyzing = useAppStore((s) => s.botAnalyzing)
+  const lastDecisionAt = useAppStore((s) => s.lastDecisionAt)
   const positions = useAppStore((s) => s.positions)
   const botEnabled = useConfigStore((s) => s.botEnabled)
   const sessionStartedAt = useConfigStore((s) => s.sessionStartedAt)
@@ -153,7 +161,7 @@ export function AiPanel() {
     }
   }
 
-  const seconds = secondsToNextMinute(now)
+  const seconds = secondsUntilNextDecision(now, lastDecisionAt ?? sessionStartedAt)
 
   return (
     <div className="border-term-border bg-term-panel flex w-80 shrink-0 flex-col overflow-y-auto border-l">

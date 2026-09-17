@@ -5,15 +5,18 @@ import type { Candle, MarketCtx } from '../lib/hl/types'
 import type { ConnectionStatus } from '../lib/hl/ws'
 import type { Bias, Regime } from '../lib/indicators/types'
 import { formatSignedUsd, pnlForPosition } from '../lib/sim'
+import { addBotLogEntry as persistBotLogEntry } from '../lib/storage/botLog'
+import type { BotLogEntry } from '../lib/storage/botLog'
 import { addLedgerEntry } from '../lib/storage/ledger'
 import type { CloseReason, LedgerEntry } from '../lib/storage/ledger'
 import { deletePosition, savePosition } from '../lib/storage/positions'
 import type { SimPosition } from '../lib/storage/positions'
 
 export type WsState = ConnectionStatus | 'idle'
-export type { SimPosition }
+export type { SimPosition, BotLogEntry }
 
-const MAX_BOT_LOG_ENTRIES = 200
+/** Also the in-memory hydration cap `usePersistedBotLog` applies when loading from IndexedDB. */
+export const MAX_BOT_LOG_ENTRIES = 200
 
 const CLOSE_REASON_LABELS: Record<CloseReason, string> = {
   manual: 'Closed',
@@ -36,12 +39,6 @@ export interface BotStatus extends BotDecisionResult {
   timestamp: number
 }
 
-/** One entry in the running Jev decision log (every call, not just the latest per coin). */
-export interface BotLogEntry extends BotDecisionResult {
-  timestamp: number
-  coin: string
-}
-
 interface AppStore {
   coin: string
   interval: string
@@ -62,6 +59,13 @@ interface AppStore {
   botLog: BotLogEntry[]
   /** True only while a /api/bot-decision request is actually in flight. */
   botAnalyzing: boolean
+  /**
+   * Wall-clock time of the last /api/bot-decision response — success or failure,
+   * whichever settles first. Drives the "Next Jev analysis" countdown ring
+   * (`AiPanel`): it counts down from 60 anchored here, so it only resets when a
+   * call actually completes, not just on a wall-clock minute boundary.
+   */
+  lastDecisionAt: number | null
 
   /** Paper-trading simulator: open hypothetical positions and the size/leverage inputs for the next one. */
   positions: SimPosition[]
@@ -85,6 +89,7 @@ interface AppStore {
   setBotStatus: (coin: string, status: BotStatus) => void
   addBotLogEntry: (entry: BotLogEntry) => void
   setBotAnalyzing: (botAnalyzing: boolean) => void
+  setLastDecisionAt: (lastDecisionAt: number) => void
 
   openPosition: (input: Omit<SimPosition, 'id' | 'openedAt'>) => void
   /**
@@ -100,6 +105,8 @@ interface AppStore {
   /** Seeds `realizedPnl` and `ledger` from durable storage; called once on startup. `sessionPnl` is deliberately not seeded. */
   hydrateRealizedPnl: (total: number) => void
   hydrateLedger: (entries: LedgerEntry[]) => void
+  /** Seeds the Jev call log from durable storage (newest first, capped); called once on startup. */
+  hydrateBotLog: (entries: BotLogEntry[]) => void
   setSimSizeUsd: (sizeUsd: number) => void
   setSimLeverage: (leverage: number) => void
 }
@@ -117,6 +124,7 @@ export const useAppStore = create<AppStore>((set) => ({
   botStatus: {},
   botLog: [],
   botAnalyzing: false,
+  lastDecisionAt: null,
   positions: [],
   simSizeUsd: 5000,
   simLeverage: 5,
@@ -133,8 +141,12 @@ export const useAppStore = create<AppStore>((set) => ({
   setLastBarCloseAt: (lastBarCloseAt) => set({ lastBarCloseAt }),
   setWatchlistEntry: (coin, entry) => set((s) => ({ watchlistData: { ...s.watchlistData, [coin]: entry } })),
   setBotStatus: (coin, status) => set((s) => ({ botStatus: { ...s.botStatus, [coin]: status } })),
-  addBotLogEntry: (entry) => set((s) => ({ botLog: [entry, ...s.botLog].slice(0, MAX_BOT_LOG_ENTRIES) })),
+  addBotLogEntry: (entry) => {
+    void persistBotLogEntry(entry)
+    set((s) => ({ botLog: [entry, ...s.botLog].slice(0, MAX_BOT_LOG_ENTRIES) }))
+  },
   setBotAnalyzing: (botAnalyzing) => set({ botAnalyzing }),
+  setLastDecisionAt: (lastDecisionAt) => set({ lastDecisionAt }),
 
   openPosition: (input) =>
     set((s) => {
@@ -194,6 +206,7 @@ export const useAppStore = create<AppStore>((set) => ({
   hydratePositions: (positions) => set({ positions }),
   hydrateRealizedPnl: (realizedPnl) => set({ realizedPnl }),
   hydrateLedger: (entries) => set({ ledger: entries }),
+  hydrateBotLog: (entries) => set({ botLog: entries.slice(0, MAX_BOT_LOG_ENTRIES) }),
   setSimSizeUsd: (simSizeUsd) => set({ simSizeUsd }),
   setSimLeverage: (simLeverage) => set({ simLeverage }),
 }))

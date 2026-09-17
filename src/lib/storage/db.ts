@@ -1,8 +1,9 @@
 const DB_NAME = 'hl-term'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 export const POSITIONS_STORE = 'positions'
 export const LEDGER_STORE = 'ledger'
+export const BOT_LOG_STORE = 'botLog'
 
 function upgrade(db: IDBDatabase): void {
   if (!db.objectStoreNames.contains(POSITIONS_STORE)) {
@@ -10,6 +11,11 @@ function upgrade(db: IDBDatabase): void {
   }
   if (!db.objectStoreNames.contains(LEDGER_STORE)) {
     db.createObjectStore(LEDGER_STORE, { keyPath: 'id', autoIncrement: true })
+  }
+  if (!db.objectStoreNames.contains(BOT_LOG_STORE)) {
+    // Out-of-line auto-incrementing key — entries have no natural id of their own,
+    // nothing ever updates or deletes one by id, only adds and reads them all back.
+    db.createObjectStore(BOT_LOG_STORE, { autoIncrement: true })
   }
 }
 

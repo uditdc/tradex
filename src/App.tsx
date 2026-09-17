@@ -7,6 +7,7 @@ import { StatusLine } from './components/StatusLine'
 import { TopBar } from './components/TopBar'
 import { Watchlist } from './components/Watchlist'
 import { useCandles } from './hooks/useCandles'
+import { usePersistedBotLog } from './hooks/usePersistedBotLog'
 import { usePersistedLedger } from './hooks/usePersistedLedger'
 import { usePersistedPositions } from './hooks/usePersistedPositions'
 import { usePositionMonitor } from './hooks/usePositionMonitor'
@@ -21,6 +22,7 @@ function App() {
   useWatchlist()
   usePersistedPositions()
   usePersistedLedger()
+  usePersistedBotLog()
   usePositionMonitor()
   useTradingBot()
 
