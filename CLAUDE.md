@@ -9,6 +9,12 @@ execution — trades happen elsewhere. The AI panel's "trade suggestion" is a lo
 hypothetical paper position (entry/target/stop, live PnL against real price) for
 tracking a thesis — it never places, signs, or touches a real order.
 
+An optional trading bot (off by default) layers on top: TypeSafe's Jev model returns a
+fast typed buy/sell/hold judgment on the active coin's 1m closes, and a pure policy
+function (`decideBotAction` in `lib/sim.ts`) turns that into open/close calls against
+the same paper-trading engine — still never a real order, same non-goal as the manual
+trade suggestion above.
+
 Indicators (bias, RSI, ATR%, volume ratio, swing support/resistance, regime — see
 "Indicator block (v1 scope)") are still computed deterministically every tick; there is
 no dedicated visual panel for them (dropped in Phase 6 to match the imported design),
@@ -40,6 +46,12 @@ but they still drive the chart's price lines and the AI trade suggestion's targe
   or providers later is a `server/.env` change, not a code change, as long as the
   provider speaks the OpenAI chat-completions shape (OpenRouter does, for any model
   it hosts, Anthropic's included).
+- `@typesafe-ai/sdk` (TypeSafe's Jev model) is a second, separate AI provider used
+  only for the trading bot's fast buy/sell/hold judgment (`/api/bot-decision`) — a
+  typed `choice()` call, not a narrative completion. Needs its own
+  `TYPESAFE_API_KEY` in `server/.env`; unlike `LLM_API_KEY` this one is optional at
+  startup (the bot is opt-in and off by default), so a missing key just disables
+  that one route with a clear error instead of blocking the server.
 - WebSocket to Hyperliquid straight from the browser
 - `vitest` for tests, indicators fully covered
 
@@ -49,13 +61,15 @@ but they still drive the chart's price lines and the AI trade suggestion's targe
 src/
   lib/hl/          # REST snapshot, WS candle subscription, candle buffer. No React.
   lib/indicators/  # Pure functions: candles in, numbers out. No I/O. Fully tested.
-  lib/ai/          # Context payload builder + client for /api/read, /api/ask
-  lib/sim.ts       # Pure paper-position PnL/verdict helpers. No I/O. Tested.
-  hooks/           # useCandles(coin, interval), useIndicators(), useAiRead()
+  lib/ai/          # Context/client for /api/read, /api/ask, /api/bot-decision
+  lib/sim.ts       # Pure paper-position PnL/verdict/bot-policy helpers. No I/O. Tested.
+  lib/storage/     # IndexedDB: AI read history, paper positions, realized-PnL ledger
+  hooks/           # useCandles, useIndicators, useAiRead, useTradingBot, ...
   components/      # TopBar, ChartPanel, AiPanel, CommandPalette, Watchlist
   App.tsx
 server/
-  index.ts         # Hono: /api/read, /api/ask (SSE streaming), optional /api/hl proxy
+  index.ts         # Hono: /api/read, /api/ask, /api/bot-decision (TypeSafe), optional
+                    # /api/hl proxy
 scripts/
   probe.ts         # tsx script: print candles + funding/OI for a coin, no UI
 ```
@@ -65,7 +79,8 @@ scripts/
 - Indicators are pure and deterministic; test against hand-verified fixtures.
 - The AI layer never computes indicators; it receives them.
 - One store (zustand) holds: coin, interval, candle buffer, indicator dict, AI read
-  cache keyed by `${coin}:${interval}`, and the paper-trading simulator's positions.
+  cache keyed by `${coin}:${interval}`, the paper-trading simulator's positions, and
+  the trading bot's latest decision per coin.
 
 ## Indicator block (v1 scope)
 
@@ -113,5 +128,6 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
 - Every phase ends with: `vitest` green, typecheck clean, `ROADMAP.md` box ticked plus a
   two-line note on what actually got built and anything surprising.
 - Never invent Hyperliquid API fields — fetch a real response and inspect it.
-- The LLM API key lives in `server/.env` only. It must never reach the client bundle.
+- The LLM and TypeSafe API keys live in `server/.env` only. They must never reach the
+  client bundle.
 - If a phase balloons, stop, split it in `ROADMAP.md`, and ask.

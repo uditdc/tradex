@@ -699,6 +699,103 @@ Notes:
 
 ---
 
+## Phase 13 — Trading bot: Jev-driven buy/sell/hold on the paper engine
+- [x] `/api/bot-decision`: a fast typed judgment (TypeSafe's Jev, via `@typesafe-ai/sdk`'s
+      `choice()` primitive) — buy/sell/hold + confidence, given the coin's deterministic
+      indicators and any currently held paper position. Optional at startup: no
+      `TYPESAFE_API_KEY` just disables the route with a clear 503, unlike the
+      required `LLM_API_KEY`, since the bot is opt-in and off by default
+- [x] Pure, tested policy (`lib/sim.ts`'s `decideBotAction`) turns a decision +
+      confidence + held side into open/close-and-flip/no-op — confidence-gated per
+      TypeSafe's own guidance, kept as deterministic code rather than a second model
+      call, since side-matching is a rule, not a judgment
+- [x] `useTradingBot`: polls the active coin's 1m candles (independent of whatever
+      interval the chart is displaying) every 15s, and on each newly closed 1m bar
+      asks for a decision and applies it against the existing paper-trading engine
+      (`openPosition`/`closePosition` from Phases 9–11 — same persistence, ledger,
+      and toasts, no new execution path). Off by default; toggled in a new
+      "Trading Bot" panel in `AiPanel` showing live decision/confidence/probabilities
+- [x] The trade-suggestion side (and by extension the manual OPEN button) now prefers
+      the bot's live decision over the narrative `/api/read`'s own bias when the bot
+      is running, falling back gracefully when it isn't — this is the "replace
+      predictive analysis with Jev" part
+
+**Done when:** turning the bot on for a coin produces a visible buy/sell/hold call on
+every 1m close, and a confident signal opens (or flips) a real paper position with a
+ledger entry and a toast, same as a manual close already does.
+
+Notes:
+
+- Triggered by a mid-conversation pivot request ("replace predictive analysis with
+  TypeSafe AI's Jev model... instant trading bot... buy/sell/hold... hyper quick
+  intervals"), not a pre-planned roadmap item — confirmed scope with the user first
+  (`AskUserQuestion`) on three real forks: (1) paper-only vs. real order execution —
+  paper-only, since real execution directly contradicts CLAUDE.md's locked
+  non-goals; (2) replace `/api/read`'s bias/`position_guidance` with Jev vs. add it
+  as a separate layer — chose "replace" for what actually drives the trade
+  suggestion and the bot, but kept the narrative read's own contract/types
+  completely intact rather than ripping `bias`/`position_guidance` out of `AiRead`
+  (which Phase 12's whole position-aware context threads through) — see below; (3)
+  decision cadence — every closed candle on a fast interval, reusing the existing
+  bar-close-trigger pattern rather than inventing a sub-second polling loop.
+- **What "replace" means concretely:** `/api/read`'s own contract, `AiRead` type,
+  `parse.ts`, and Phase 12's position-aware context are all untouched — still work
+  exactly as before. What changed is what the UI *acts on*: `AiPanel`'s
+  `suggestionSide` (which drives the trade-suggestion card and the manual OPEN
+  button) now prefers `botStatus[coin]`'s live decision over
+  `read?.parsed?.bias ?? dict?.bias`, falling back to the old chain when the bot
+  hasn't judged this coin yet or is off. Ripping `bias`/`position_guidance` out of
+  the narrative type entirely was considered and rejected — it would have touched
+  six-plus files coupled to Phase 12 for no real benefit, since the new bot panel is
+  its own clearly-labeled, more prominent signal anyway.
+- **Why policy is code, not a second model call:** TypeSafe's own building guide
+  says to keep known rules, calculations, and execution in code and add the model
+  only where semantic understanding is needed. Given a decision and a held side,
+  "keep / flip / open" is a deterministic lookup, not a judgment — `decideBotAction`
+  is pure and 6 unit tests cover every branch (open, hold-noop, below-threshold,
+  side-matches, side-opposes, custom threshold).
+- **Confidence gating:** `BOT_CONFIDENCE_THRESHOLD = 0.6`, per
+  docs.typesafe.ai/confidence's three-tier framework (act automatically above a
+  threshold validated against the domain's risk). This is paper money, not the
+  docs' real-fund example (>0.9), so 0.6 favors actually trading over sitting idle
+  — worth tuning once real decision quality is observable.
+- **Decision cadence is deliberately its own 1m subscription, not the chart's
+  active interval.** The app's established constraint (documented since Phase 2) is
+  one live WS subscription for whatever the chart displays; rather than fight that,
+  the bot REST-polls (`candleSnapshot`, same call `useWatchlist` already uses) every
+  15s and only acts on a genuinely new 1m bar close (`openTime` advancing) — same
+  pattern as the watchlist poller, just faster and scoped to the active coin instead
+  of the whole watchlist. This means "on" always means fast regardless of what
+  interval the user has the chart set to.
+- `lib/storage/ledger.ts`'s `CloseReason` gained `'bot'`; the store's toast label map
+  (already added for Phase 10's manual/stop_loss/take_profit) gained `'Bot flipped'`
+  — a bot-driven close now reads clearly in both the toast and the ledger, not
+  lumped in with a manual close.
+- `store/config.ts` gained `botEnabled` (persisted, off by default, same
+  `zustand/persist` pattern as watchlist/defaultInterval/lookback from Phase 5).
+  It does survive a reload once turned on, matching how every other config value
+  in this store already behaves — the safety property is "off by default on a
+  fresh install," not "never resumes automatically." Worth reconsidering if an
+  always-resuming bot turns out to surprise people in practice.
+- **Missing-key behavior verified live:** without `TYPESAFE_API_KEY` set (real
+  state right now — the key must be added to `server/.env` by whoever runs this),
+  `/api/bot-decision` returns a clear 503 instead of crashing the server (unlike
+  the required `LLM_API_KEY`/`LLM_MODEL`, which still throw at startup). Toggling
+  the bot on in a real browser correctly showed "Waiting for the next 1m close...",
+  fired a real request with the real live `IndicatorDict` as `state` once a 1m bar
+  closed, and surfaced the 503 as a single toast (deduped via a ref so it doesn't
+  re-toast every 15s while the key stays unconfigured) — confirms every layer of
+  the pipeline except the actual Jev call itself, which needs a real key to verify.
+  **This is the one thing still unverified end-to-end** — worth a real pass once a
+  `TYPESAFE_API_KEY` is available, to confirm actual decision quality/latency, not
+  just that the plumbing is correct.
+- SDK confirmed directly against its shipped `.d.ts` (`@typesafe-ai/sdk@0.6.0`)
+  rather than only the docs site, after two research-subagent attempts returned
+  unusable placeholder text instead of real findings — fetched
+  `docs.typesafe.ai`'s SDK/API/primitives/confidence pages directly instead.
+
+---
+
 ## Parking lot (ideas, not commitments)
 - Alerts: price crosses an AI level, funding flip, RSI extreme → Sonner toast + sound
 - Fast model for auto-reads, stronger model for `/` questions

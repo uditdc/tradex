@@ -7,6 +7,7 @@ beforeEach(() => {
     watchlist: ['HYPE', 'BTC', 'ETH', 'SOL', 'XRP', 'DOGE'],
     defaultInterval: '1h',
     lookback: 210,
+    botEnabled: false,
   })
 })
 
@@ -34,5 +35,13 @@ describe('useConfigStore', () => {
     useConfigStore.getState().setLookback(300)
     expect(useConfigStore.getState().defaultInterval).toBe('4h')
     expect(useConfigStore.getState().lookback).toBe(300)
+  })
+
+  it('toggleBot flips botEnabled, off by default', () => {
+    expect(useConfigStore.getState().botEnabled).toBe(false)
+    useConfigStore.getState().toggleBot()
+    expect(useConfigStore.getState().botEnabled).toBe(true)
+    useConfigStore.getState().toggleBot()
+    expect(useConfigStore.getState().botEnabled).toBe(false)
   })
 })

@@ -3,6 +3,7 @@ import {
   checkSlTp,
   computePortfolio,
   computePositionVerdict,
+  decideBotAction,
   formatSignedPct,
   formatSignedUsd,
   livePriceForPosition,
@@ -136,5 +137,37 @@ describe('formatSignedPct', () => {
 
   it('shows exactly zero with no sign', () => {
     expect(formatSignedPct(0)).toBe('0.00%')
+  })
+})
+
+describe('decideBotAction', () => {
+  it('opens a new position in the decided direction when nothing is held', () => {
+    expect(decideBotAction('buy', 0.8, null)).toEqual({ type: 'open', side: 'long' })
+    expect(decideBotAction('sell', 0.8, null)).toEqual({ type: 'open', side: 'short' })
+  })
+
+  it('does nothing on hold, regardless of confidence', () => {
+    expect(decideBotAction('hold', 0.95, null)).toEqual({ type: 'noop' })
+    expect(decideBotAction('hold', 0.95, 'long')).toEqual({ type: 'noop' })
+  })
+
+  it('does nothing when confidence is below the threshold', () => {
+    expect(decideBotAction('buy', 0.59, null)).toEqual({ type: 'noop' })
+    expect(decideBotAction('buy', 0.6, null, 0.6)).toEqual({ type: 'open', side: 'long' })
+  })
+
+  it('does nothing when the decision agrees with the held side', () => {
+    expect(decideBotAction('buy', 0.9, 'long')).toEqual({ type: 'noop' })
+    expect(decideBotAction('sell', 0.9, 'short')).toEqual({ type: 'noop' })
+  })
+
+  it('closes and flips when the decision opposes the held side', () => {
+    expect(decideBotAction('sell', 0.9, 'long')).toEqual({ type: 'close_and_flip', side: 'short' })
+    expect(decideBotAction('buy', 0.9, 'short')).toEqual({ type: 'close_and_flip', side: 'long' })
+  })
+
+  it('honors a custom confidence threshold', () => {
+    expect(decideBotAction('buy', 0.5, null, 0.4)).toEqual({ type: 'open', side: 'long' })
+    expect(decideBotAction('buy', 0.3, null, 0.4)).toEqual({ type: 'noop' })
   })
 })

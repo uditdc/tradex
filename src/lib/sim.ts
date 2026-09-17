@@ -1,4 +1,5 @@
 import type { WatchlistEntry } from '../store'
+import type { BotDecision } from './ai/bot'
 
 export interface SimPositionLike {
   coin: string
@@ -92,6 +93,39 @@ export function formatSignedUsd(n: number): string {
 export function formatSignedPct(n: number): string {
   const sign = n > 0 ? '+' : n < 0 ? '-' : ''
   return `${sign}${Math.abs(n).toFixed(2)}%`
+}
+
+/**
+ * Below this confidence, the bot does nothing regardless of `decision` — per TypeSafe's own
+ * confidence guidance (docs.typesafe.ai/confidence), gate automatic action on a threshold
+ * validated against the domain. This isn't high-stakes (paper positions only), so it sits
+ * well under the docs' real-money example (>0.9); 0.6 favors actually trading over sitting idle.
+ */
+export const BOT_CONFIDENCE_THRESHOLD = 0.6
+
+export type BotAction =
+  | { type: 'open'; side: 'long' | 'short' }
+  | { type: 'close_and_flip'; side: 'long' | 'short' }
+  | { type: 'noop' }
+
+/**
+ * Turns a Jev buy/sell/hold judgment into a concrete trading-bot action. Pure policy, no I/O:
+ * confidence gating and side-matching are deterministic rules, not something the model needs
+ * to be asked about separately.
+ */
+export function decideBotAction(
+  decision: BotDecision,
+  confidence: number,
+  heldSide: 'long' | 'short' | null,
+  confidenceThreshold: number = BOT_CONFIDENCE_THRESHOLD,
+): BotAction {
+  if (confidence < confidenceThreshold) return { type: 'noop' }
+  if (decision === 'hold') return { type: 'noop' }
+
+  const side = decision === 'buy' ? 'long' : 'short'
+  if (heldSide === null) return { type: 'open', side }
+  if (heldSide === side) return { type: 'noop' }
+  return { type: 'close_and_flip', side }
 }
 
 /** Starting balance of the global paper-trading account (CLAUDE.md's paper-trading simulator — no real funds). */

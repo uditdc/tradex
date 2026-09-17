@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { create } from 'zustand'
+import type { BotDecisionResult } from '../lib/ai/bot'
 import type { AskState, LogEntry, ReadState } from '../lib/ai/types'
 import type { Candle, MarketCtx } from '../lib/hl/types'
 import type { ConnectionStatus } from '../lib/hl/ws'
@@ -15,12 +16,24 @@ export type { SimPosition }
 
 const MAX_LOG_ENTRIES = 200
 
+const CLOSE_REASON_LABELS: Record<CloseReason, string> = {
+  manual: 'Closed',
+  stop_loss: 'Stop-loss hit',
+  take_profit: 'Take-profit hit',
+  bot: 'Bot flipped',
+}
+
 export interface WatchlistEntry {
   price: number
   bias: Bias
   regime: Regime
   /** openTime of the latest candle seen for this coin; used to detect a new bar close. */
   lastOpenTime: number
+}
+
+/** Trading bot's latest Jev judgment for a coin, plus when it was made. */
+export interface BotStatus extends BotDecisionResult {
+  timestamp: number
 }
 
 interface AppStore {
@@ -43,6 +56,9 @@ interface AppStore {
   /** Background-polled watchlist snapshot, keyed by coin. */
   watchlistData: Record<string, WatchlistEntry>
 
+  /** Trading bot's latest decision per coin, keyed by coin. */
+  botStatus: Record<string, BotStatus>
+
   /** Paper-trading simulator: open hypothetical positions and the size/leverage inputs for the next one. */
   positions: SimPosition[]
   simSizeUsd: number
@@ -61,6 +77,7 @@ interface AppStore {
   setAskState: (state: AskState | null) => void
   addLogEntry: (entry: LogEntry) => void
   setWatchlistEntry: (coin: string, entry: WatchlistEntry) => void
+  setBotStatus: (coin: string, status: BotStatus) => void
 
   openPosition: (input: Omit<SimPosition, 'id' | 'openedAt'>) => void
   /**
@@ -92,6 +109,7 @@ export const useAppStore = create<AppStore>((set) => ({
   askState: null,
   readLog: [],
   watchlistData: {},
+  botStatus: {},
   positions: [],
   simSizeUsd: 5000,
   simLeverage: 5,
@@ -108,6 +126,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setAskState: (askState) => set({ askState }),
   addLogEntry: (entry) => set((s) => ({ readLog: [...s.readLog, entry].slice(-MAX_LOG_ENTRIES) })),
   setWatchlistEntry: (coin, entry) => set((s) => ({ watchlistData: { ...s.watchlistData, [coin]: entry } })),
+  setBotStatus: (coin, status) => set((s) => ({ botStatus: { ...s.botStatus, [coin]: status } })),
 
   openPosition: (input) =>
     set((s) => {
@@ -140,7 +159,7 @@ export const useAppStore = create<AppStore>((set) => ({
         reason,
       })
       void deletePosition(id)
-      const reasonLabel = reason === 'manual' ? 'Closed' : reason === 'stop_loss' ? 'Stop-loss hit' : 'Take-profit hit'
+      const reasonLabel = CLOSE_REASON_LABELS[reason]
       const message = `${reasonLabel}: ${position.side.toUpperCase()} ${position.coin} ${formatSignedUsd(pnl)}`
       if (pnl >= 0) toast.success(message)
       else toast.error(message)

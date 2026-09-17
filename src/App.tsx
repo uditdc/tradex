@@ -10,6 +10,7 @@ import { useCandles } from './hooks/useCandles'
 import { usePersistedLedger } from './hooks/usePersistedLedger'
 import { usePersistedPositions } from './hooks/usePersistedPositions'
 import { usePositionMonitor } from './hooks/usePositionMonitor'
+import { useTradingBot } from './hooks/useTradingBot'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useAppStore } from './store'
 
@@ -22,6 +23,7 @@ function App() {
   usePersistedPositions()
   usePersistedLedger()
   usePositionMonitor()
+  useTradingBot()
 
   return (
     <div className="bg-term-bg flex h-screen w-screen flex-col overflow-hidden">

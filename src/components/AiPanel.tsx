@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAppStore } from '../store'
+import { useConfigStore } from '../store/config'
 import { useIndicators } from '../hooks/useIndicators'
 import { metaAndAssetCtxs } from '../lib/hl/rest'
 import {
@@ -11,6 +12,8 @@ import {
 } from '../lib/sim'
 import type { Verdict } from '../lib/sim'
 import type { SimPosition } from '../lib/storage/positions'
+
+const BOT_DECISION_CLASS: Record<string, string> = { buy: 'text-term-up', sell: 'text-term-down', hold: 'text-term-muted' }
 
 function biasClass(bias: string): string {
   const lower = bias.toLowerCase()
@@ -34,6 +37,9 @@ export function AiPanel() {
   const openPosition = useAppStore((s) => s.openPosition)
   const closePosition = useAppStore((s) => s.closePosition)
   const updatePositionSlTp = useAppStore((s) => s.updatePositionSlTp)
+  const botStatus = useAppStore((s) => s.botStatus[coin])
+  const botEnabled = useConfigStore((s) => s.botEnabled)
+  const toggleBot = useConfigStore((s) => s.toggleBot)
   const dict = useIndicators()
 
   const [rationaleExpanded, setRationaleExpanded] = useState(false)
@@ -43,7 +49,11 @@ export function AiPanel() {
   const read = aiReadCache[`${coin}:${interval}`] ?? null
   const activePrice = candles.length > 0 ? candles[candles.length - 1].close : null
 
-  const suggestionSide = suggestionSideFromBias(read?.parsed?.bias ?? dict?.bias)
+  // The trading bot's live Jev decision is the primary signal once it's running; the
+  // narrative AI read's own bias (still shown in its own section below) is only the
+  // fallback for a coin the bot hasn't judged yet, or when the bot is off.
+  const botSide = botStatus && botStatus.decision !== 'hold' ? (botStatus.decision === 'buy' ? 'long' : 'short') : undefined
+  const suggestionSide = botSide ?? suggestionSideFromBias(read?.parsed?.bias ?? dict?.bias)
   const suggestionTarget = suggestionSide === 'long' ? dict?.swingResistance?.price : dict?.swingSupport?.price
   const suggestionStop = suggestionSide === 'long' ? dict?.swingSupport?.price : dict?.swingResistance?.price
 
@@ -121,6 +131,44 @@ export function AiPanel() {
 
   return (
     <div className="border-term-border bg-term-panel flex w-80 shrink-0 flex-col gap-3 overflow-y-auto border-l p-3">
+      <div className="border-term-border flex flex-col gap-2 border-b pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${botEnabled ? 'bg-term-amber pulse-glow' : 'bg-term-muted'}`}
+            />
+            <span className="text-term-muted text-[11px] tracking-widest uppercase">Trading Bot</span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleBot}
+            className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
+              botEnabled ? 'border-term-amber text-term-amber' : 'border-term-border text-term-muted'
+            }`}
+          >
+            {botEnabled ? 'On' : 'Off'}
+          </button>
+        </div>
+        {botEnabled &&
+          (botStatus ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between">
+                <span className={`text-sm font-semibold uppercase ${BOT_DECISION_CLASS[botStatus.decision]}`}>
+                  {botStatus.decision} {coin}
+                </span>
+                <span className="text-term-muted text-xs tabular-nums">{Math.round(botStatus.confidence * 100)}%</span>
+              </div>
+              <div className="text-term-muted flex gap-2 text-[10px] tabular-nums">
+                <span>buy {Math.round(botStatus.probabilities.buy * 100)}%</span>
+                <span>sell {Math.round(botStatus.probabilities.sell * 100)}%</span>
+                <span>hold {Math.round(botStatus.probabilities.hold * 100)}%</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-term-muted text-xs">Waiting for the next 1m close...</p>
+          ))}
+      </div>
+
       {askState && (
         <div className="border-term-border flex flex-col gap-1 border-b pb-3">
           <span className="text-term-muted text-[11px] tracking-widest uppercase">Ask</span>
