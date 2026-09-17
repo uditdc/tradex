@@ -1264,6 +1264,17 @@ Notes:
 - `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 103 passed (3 new
   for `botLog.ts`'s add/get round-trip and ordering).
 
+## Phase 24 — Trade History as a table, matching Positions
+- [x] `ActivityBar`'s Trade History tab was a stack of flex rows, the odd one
+  out next to the Positions tab's actual `<table>`. Converted to a `<table>`
+  with the same header/row classes as Positions (`text-term-muted
+  border-term-border border-b text-[10px] tracking-widest uppercase` head,
+  `border-term-border/60 border-b tabular-nums` rows) — Time, Coin, Side,
+  Size, Lev, Entry, Exit, PnL, Reason columns.
+- Not visually verified in a browser — no browser-automation tool available
+  this session (same limitation as recent phases).
+- `pnpm typecheck`/`test` (103 passed, unchanged)/`lint`/`build` all green.
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

@@ -210,26 +210,44 @@ function HistoryTab() {
   if (ledger.length === 0) return <p className="text-term-muted text-sm">No closed trades yet.</p>
 
   return (
-    <div className="flex flex-col gap-1">
-      {ledger.slice(0, 30).map((entry) => (
-        <div key={entry.id} className="border-term-border flex items-center justify-between gap-2 border-b py-1 text-xs">
-          <div className="flex flex-col">
-            <span className="flex items-center gap-1">
-              <span className={entry.side === 'long' ? 'text-term-up' : 'text-term-down'}>
-                {entry.coin} {entry.side.toUpperCase()}
-              </span>
-              <span className="text-term-muted text-[10px] uppercase">{entry.reason.replace('_', ' ')}</span>
-            </span>
-            <span className="text-term-muted text-[10px] tabular-nums">
-              {entry.entryPrice.toFixed(2)} → {entry.exitPrice.toFixed(2)} · {fmtClock(entry.closedAt)}
-            </span>
-          </div>
-          <span className={`font-semibold ${entry.pnl >= 0 ? 'text-term-up' : 'text-term-down'}`}>
-            {formatSignedUsd(entry.pnl)}
-          </span>
-        </div>
-      ))}
-    </div>
+    <table className="w-full border-collapse text-xs">
+      <thead>
+        <tr className="text-term-muted border-term-border border-b text-[10px] tracking-widest uppercase">
+          <th className="px-1.5 py-1 text-left font-normal">Time</th>
+          <th className="px-1.5 py-1 text-left font-normal">Coin</th>
+          <th className="px-1.5 py-1 text-left font-normal">Side</th>
+          <th className="px-1.5 py-1 text-right font-normal">Size</th>
+          <th className="px-1.5 py-1 text-right font-normal">Lev</th>
+          <th className="px-1.5 py-1 text-right font-normal">Entry</th>
+          <th className="px-1.5 py-1 text-right font-normal">Exit</th>
+          <th className="px-1.5 py-1 text-right font-normal">PnL</th>
+          <th className="px-1.5 py-1 text-left font-normal">Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {ledger.slice(0, 30).map((entry) => (
+          <tr key={entry.id} className="border-term-border/60 border-b tabular-nums">
+            <td className="text-term-muted px-1.5 py-1.5">{fmtClock(entry.closedAt)}</td>
+            <td className="px-1.5 py-1.5 font-semibold">{entry.coin}</td>
+            <td className={`px-1.5 py-1.5 font-semibold ${entry.side === 'long' ? 'text-term-up' : 'text-term-down'}`}>
+              {entry.side.toUpperCase()}
+            </td>
+            <td className="text-term-muted px-1.5 py-1.5 text-right">${entry.sizeUsd.toLocaleString()}</td>
+            <td className="text-term-muted px-1.5 py-1.5 text-right">{entry.leverage}x</td>
+            <td className="text-term-muted px-1.5 py-1.5 text-right">{entry.entryPrice.toFixed(2)}</td>
+            <td className="text-term-muted px-1.5 py-1.5 text-right">{entry.exitPrice.toFixed(2)}</td>
+            <td
+              className={`px-1.5 py-1.5 text-right font-semibold ${entry.pnl >= 0 ? 'text-term-up' : 'text-term-down'}`}
+            >
+              {formatSignedUsd(entry.pnl)}
+            </td>
+            <td className="text-term-muted px-1.5 py-1.5 text-[10px] tracking-wide uppercase">
+              {entry.reason.replace('_', ' ')}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
