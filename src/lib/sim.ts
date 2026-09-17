@@ -124,6 +124,38 @@ export function decideBotAction(
   return { type: 'close_and_flip', side }
 }
 
+export interface SlTpLevels {
+  stopLoss?: number
+  takeProfit?: number
+}
+
+/**
+ * Stop-loss/take-profit for a newly opened position: anchored to the nearest swing
+ * support/resistance, then both pushed further away by an ATR-scaled buffer sized by
+ * Jev's `riskWidth` score (0 = tight, hugs the raw swing level with no buffer; 2 = wide,
+ * a full ATR of extra room on both the stop and the target). `riskWidthScore` outside
+ * 0-2 is clamped. Either level is `undefined` when its swing level doesn't exist yet.
+ */
+export function computeStopLossTakeProfit(
+  side: 'long' | 'short',
+  price: number,
+  atrPercent: number,
+  riskWidthScore: number,
+  swingSupport: number | null,
+  swingResistance: number | null,
+): SlTpLevels {
+  const widthFrac = Math.max(0, Math.min(1, riskWidthScore / 2))
+  const buffer = price * (atrPercent / 100) * widthFrac
+  const near = side === 'long' ? swingSupport : swingResistance
+  const far = side === 'long' ? swingResistance : swingSupport
+  const nearSign = side === 'long' ? -1 : 1
+  const farSign = side === 'long' ? 1 : -1
+  return {
+    stopLoss: near != null ? near + nearSign * buffer : undefined,
+    takeProfit: far != null ? far + farSign * buffer : undefined,
+  }
+}
+
 /** Starting balance of the global paper-trading account (CLAUDE.md's paper-trading simulator — no real funds). */
 export const STARTING_BALANCE = 10_000
 

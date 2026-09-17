@@ -1075,6 +1075,33 @@ Notes:
   pass, which rules out most wiring bugs, but layout/spacing should still get a
   once-over from the user before calling this final.
 
+## Phase 18 — Jev-steered stop-loss/take-profit width
+- [x] `/api/bot-decision` gained a ninth Jev question, `riskWidth`: a `score()`
+  on a 3-point tight/normal/wide rubric (index 0-2), asked in the same call as
+  everything else. Unlike the six `factors`, this is operational rather than
+  explanatory.
+- [x] Entry price stays deterministic — it's just the live price at open, never
+  something asked of Jev. Precise price numbers are a poor fit for `choice()`/
+  `score()` (typed judgments over described criteria, not numeric regression),
+  so the actual SL/TP math stays in code and only the risk-width input comes
+  from Jev.
+- [x] New pure helper `computeStopLossTakeProfit` (`lib/sim.ts`, fully tested):
+  anchors stop-loss/take-profit to the nearest swing support/resistance as
+  before, then pushes both further from price by an ATR-scaled buffer —
+  `riskWidth` 0 adds no buffer (hugs the raw swing level, today's old
+  behavior), 2 adds a full ATR of extra room on both sides. `useTradingBot`
+  calls it instead of reading `swingSupport`/`swingResistance` directly.
+- [x] `BotDecisionResult` gained `riskWidth: { score, confidence }`. `CLAUDE.md`
+  updated (nine questions now, not eight).
+- Verified against the real TypeSafe API key (user's own `pnpm dev` was already
+  running — used it as-is, did not start or stop anything): a clean, low-ATR
+  (0.6%) BTC uptrend returned `riskWidth: 0.44` (tight); a choppier, ranging
+  HYPE setup with 3.5% ATR and thin volume returned `riskWidth: 1.5` (leaning
+  wide) — directionally correct in both cases.
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 93 passed (5 new for
+  `computeStopLossTakeProfit`: tight/normal/wide buffer math, score clamping,
+  and the undefined-when-no-swing-level case).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

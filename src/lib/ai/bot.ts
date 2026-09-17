@@ -39,11 +39,17 @@ export interface BotFactors {
  * behind both. Independent questions in one call so `scenario` can later gate
  * which tickers get evaluated without changing how `action` drives a specific
  * trade.
+ *
+ * `riskWidth` is not explanatory like `factors` — it's operational.
+ * `useTradingBot` turns it into an ATR-scaled buffer beyond the nearest swing
+ * level for the new position's stop-loss/take-profit: 0 (tight) hugs the raw
+ * swing level, 2 (wide) pushes both further away to give the trade more room.
  */
 export interface BotDecisionResult {
   scenario: Judgment<BotScenario>
   action: Judgment<BotDecision>
   factors: BotFactors
+  riskWidth: FactorScore
 }
 
 export interface BotPositionContext {

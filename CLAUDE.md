@@ -118,11 +118,23 @@ each shaped `{ choice, confidence, probabilities }`:
   only in `server/index.ts`; the client (`AiPanel`'s `DIRECTIONAL_LABELS`/
   `CONVICTION_LABELS`) renders scores against its own short labels by the same
   index order, kept in sync by hand rather than sent over the wire.
+- `riskWidth`: `{ score, confidence }`, a Jev `score()` question scored 0–2
+  (0 = tight, 2 = wide) on how much room a stop-loss/take-profit should give the
+  trade relative to the nearest swing support/resistance. Unlike `factors`, this
+  is operational, not explanatory: `computeStopLossTakeProfit` (`lib/sim.ts`),
+  called from `useTradingBot`, turns it into an ATR-scaled buffer added beyond
+  the nearest swing level for both the stop and the target — 0 hugs the raw
+  swing level, 2 pushes both a full ATR further away. Entry price is never a
+  Jev decision — it's just the live price at the moment the bot opens; asking a
+  model to output a precise price number is a poor fit for these primitives
+  (they're typed judgments over described criteria, not numeric regression), so
+  price math stays in code and Jev only steers the risk-width input to it.
 
 No prose, no parsing needed — these are typed judgments, not a completion to
-strict-parse. All eight questions (`scenario`, `action`, six factors) are asked
-together in one call — independent questions, same state — rather than as
-separate requests, per TypeSafe's guidance on composing judgments.
+strict-parse. All nine questions (`scenario`, `action`, six factors,
+`riskWidth`) are asked together in one call — independent questions, same
+state — rather than as separate requests, per TypeSafe's guidance on composing
+judgments.
 
 ## Design direction (locked — do not re-invent per session)
 

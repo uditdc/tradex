@@ -56,6 +56,16 @@ const REGIME_RUBRIC = [
   'Regime is trending — directional continuation environment, typically the highest-conviction environment to trade with the trend.',
 ] as const
 
+// Risk-width rubric (index 0 = tight ... 2 = wide) — an operational output, not just an
+// explanatory factor: `useTradingBot` turns this into an ATR-scaled buffer beyond the
+// nearest swing level for the position's stop-loss/take-profit, so a tight read hugs
+// structure and a wide read gives the trade more room to breathe.
+const RISK_WIDTH_RUBRIC = [
+  'Tight — clean, strong structure with low noise; a stop and target close to the nearest swing level is appropriate.',
+  'Normal — typical conditions; a standard distance from the nearest swing level is appropriate.',
+  'Wide — choppy or volatile conditions where a tight stop would likely get clipped by noise; the stop and target should sit further from the nearest swing level.',
+] as const
+
 app.post('/api/bot-decision', async (c) => {
   if (!typesafeClient) {
     return c.json({ error: 'TYPESAFE_API_KEY not set in server/.env — the trading bot needs a TypeSafe API key' }, 503)
@@ -112,6 +122,12 @@ app.post('/api/bot-decision', async (c) => {
           "How does this coin's current regime tag read on a low-to-high trading-conviction scale?",
           REGIME_RUBRIC,
         ),
+        riskWidth: score(
+          "Given this coin's overall trend/momentum alignment, volatility, and regime, how much room should a " +
+            "stop-loss and take-profit give this trade relative to the nearest swing support/resistance — tight " +
+            'and close to structure, a normal distance, or wide to avoid getting clipped by noise?',
+          RISK_WIDTH_RUBRIC,
+        ),
       },
     })
     return c.json({
@@ -133,6 +149,7 @@ app.post('/api/bot-decision', async (c) => {
         volume: { score: answers.volume.score, confidence: answers.volume.confidence },
         regime: { score: answers.regime.score, confidence: answers.regime.confidence },
       },
+      riskWidth: { score: answers.riskWidth.score, confidence: answers.riskWidth.confidence },
     })
   } catch (err) {
     console.error('TypeSafe bot-decision request failed:', err)

@@ -4,7 +4,7 @@ import { requestBotDecision } from '../lib/ai/bot'
 import { intervalMs } from '../lib/hl/intervals'
 import { candleSnapshot } from '../lib/hl/rest'
 import { MIN_CANDLES, computeAll } from '../lib/indicators'
-import { decideBotAction, pnlForPosition } from '../lib/sim'
+import { computeStopLossTakeProfit, decideBotAction, pnlForPosition } from '../lib/sim'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
 
@@ -94,8 +94,14 @@ export function useTradingBot(): void {
         if (action.type === 'close_and_flip' && held) {
           closePosition(held.id, activePrice, 'bot')
         }
-        const stopLoss = action.side === 'long' ? indicators.swingSupport?.price : indicators.swingResistance?.price
-        const takeProfit = action.side === 'long' ? indicators.swingResistance?.price : indicators.swingSupport?.price
+        const { stopLoss, takeProfit } = computeStopLossTakeProfit(
+          action.side,
+          activePrice,
+          indicators.atrPercent,
+          result.riskWidth.score,
+          indicators.swingSupport?.price ?? null,
+          indicators.swingResistance?.price ?? null,
+        )
         openPosition({
           coin,
           interval: BOT_INTERVAL,

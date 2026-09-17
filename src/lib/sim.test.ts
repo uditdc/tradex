@@ -3,6 +3,7 @@ import {
   checkSlTp,
   computePortfolio,
   computePositionVerdict,
+  computeStopLossTakeProfit,
   decideBotAction,
   formatSignedPct,
   formatSignedUsd,
@@ -127,6 +128,34 @@ describe('formatSignedPct', () => {
 
   it('shows exactly zero with no sign', () => {
     expect(formatSignedPct(0)).toBe('0.00%')
+  })
+})
+
+describe('computeStopLossTakeProfit', () => {
+  it('hugs the raw swing levels with no buffer at riskWidth 0 (tight)', () => {
+    expect(computeStopLossTakeProfit('long', 100, 2, 0, 95, 105)).toEqual({ stopLoss: 95, takeProfit: 105 })
+    expect(computeStopLossTakeProfit('short', 100, 2, 0, 95, 105)).toEqual({ stopLoss: 105, takeProfit: 95 })
+  })
+
+  it('pushes both levels away from price by a fraction of ATR at riskWidth 1 (normal)', () => {
+    // atrAbs = 100 * 2% = 2; widthFrac = 1/2 = 0.5 → buffer = 1
+    expect(computeStopLossTakeProfit('long', 100, 2, 1, 95, 105)).toEqual({ stopLoss: 94, takeProfit: 106 })
+    expect(computeStopLossTakeProfit('short', 100, 2, 1, 95, 105)).toEqual({ stopLoss: 106, takeProfit: 94 })
+  })
+
+  it('pushes both levels away from price by a full ATR at riskWidth 2 (wide)', () => {
+    expect(computeStopLossTakeProfit('long', 100, 2, 2, 95, 105)).toEqual({ stopLoss: 93, takeProfit: 107 })
+    expect(computeStopLossTakeProfit('short', 100, 2, 2, 95, 105)).toEqual({ stopLoss: 107, takeProfit: 93 })
+  })
+
+  it('clamps an out-of-range riskWidth score to the 0-2 buffer range', () => {
+    expect(computeStopLossTakeProfit('long', 100, 2, -1, 95, 105)).toEqual({ stopLoss: 95, takeProfit: 105 })
+    expect(computeStopLossTakeProfit('long', 100, 2, 5, 95, 105)).toEqual({ stopLoss: 93, takeProfit: 107 })
+  })
+
+  it('leaves a level undefined when its swing level does not exist yet', () => {
+    expect(computeStopLossTakeProfit('long', 100, 2, 1, null, 105)).toEqual({ stopLoss: undefined, takeProfit: 106 })
+    expect(computeStopLossTakeProfit('long', 100, 2, 1, 95, null)).toEqual({ stopLoss: 94, takeProfit: undefined })
   })
 })
 
