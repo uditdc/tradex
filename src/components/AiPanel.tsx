@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { BotDecision, BotScenario, FactorScore } from '../lib/ai/bot'
+import { resolveClosePrice } from '../lib/closePosition'
 import { STRATEGIES } from '../lib/strategies/types'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 
 const BOT_DECISION_CLASS: Record<BotDecision, string> = {
   buy: 'text-term-up',
@@ -31,6 +33,16 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 /** Seconds left until the next wall-clock minute boundary — when `useTradingBot` next polls a closed 1m bar. */
 function secondsToNextMinute(now: number): number {
   return 60 - (Math.floor(now / 1000) % 60)
+}
+
+/** `12:34` or `1:02:03` — how long the current session has been running. */
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
 }
 
 function RingCountdown({ seconds, analyzing }: { seconds: number; analyzing: boolean }) {
@@ -103,8 +115,11 @@ export function AiPanel() {
   const setSimLeverage = useAppStore((s) => s.setSimLeverage)
   const botStatus = useAppStore((s) => s.botStatus[coin])
   const botAnalyzing = useAppStore((s) => s.botAnalyzing)
+  const positions = useAppStore((s) => s.positions)
   const botEnabled = useConfigStore((s) => s.botEnabled)
-  const toggleBot = useConfigStore((s) => s.toggleBot)
+  const sessionStartedAt = useConfigStore((s) => s.sessionStartedAt)
+  const startSession = useConfigStore((s) => s.startSession)
+  const endSession = useConfigStore((s) => s.endSession)
   const activeStrategy = useConfigStore((s) => s.activeStrategy)
   const setActiveStrategy = useConfigStore((s) => s.setActiveStrategy)
 
@@ -114,6 +129,27 @@ export function AiPanel() {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [botEnabled])
+
+  const [endDialogOpen, setEndDialogOpen] = useState(false)
+  const [ending, setEnding] = useState(false)
+
+  async function handleConfirmEnd() {
+    setEnding(true)
+    try {
+      const { positions: openPositions, candles, watchlistData, coin: activeCoin, closePosition } = useAppStore.getState()
+      const activePrice = candles.length > 0 ? candles[candles.length - 1].close : null
+      await Promise.all(
+        openPositions.map(async (p) => {
+          const price = await resolveClosePrice(p, activeCoin, activePrice, watchlistData)
+          closePosition(p.id, price, 'session_end')
+        }),
+      )
+    } finally {
+      setEnding(false)
+      setEndDialogOpen(false)
+      endSession()
+    }
+  }
 
   const seconds = secondsToNextMinute(now)
   const statusText = !botEnabled
@@ -137,21 +173,55 @@ export function AiPanel() {
               · AUTO MODE · {STRATEGIES.find((s) => s.id === activeStrategy)?.label.toUpperCase()}
             </span>
           </span>
-          <span className={`flex items-center gap-0.5 text-[10px] ${statusClass}`}>
+          <span className={`flex items-center gap-1 text-[10px] ${statusClass}`}>
             {statusText}
+            {botEnabled && sessionStartedAt !== null && (
+              <span className="text-term-muted tabular-nums">· {formatElapsed(now - sessionStartedAt)}</span>
+            )}
             <span className="blink-cursor">▌</span>
           </span>
         </div>
         <button
           type="button"
-          onClick={toggleBot}
+          onClick={botEnabled ? () => setEndDialogOpen(true) : startSession}
           className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
-            botEnabled ? 'border-term-amber text-term-amber' : 'border-term-border text-term-muted'
+            botEnabled ? 'border-term-amber text-term-amber' : 'border-term-border text-term-muted hover:border-term-amber hover:text-term-amber'
           }`}
         >
-          {botEnabled ? 'On' : 'Off'}
+          {botEnabled ? 'End Session' : 'Start Session'}
         </button>
       </div>
+
+      <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>End trading session?</DialogTitle>
+            <DialogDescription>
+              {positions.length > 0
+                ? `This closes ${positions.length} open position${positions.length === 1 ? '' : 's'} at the current market price and stops Auto Mode.`
+                : 'This stops Auto Mode. No open positions to close.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setEndDialogOpen(false)}
+              disabled={ending}
+              className="border-term-border text-term-muted rounded-sm border px-3 py-1.5 text-xs tracking-wide uppercase disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleConfirmEnd()}
+              disabled={ending}
+              className="border-term-border text-term-muted hover:border-term-amber hover:text-term-amber rounded-sm border px-3 py-1.5 text-xs font-semibold tracking-wide uppercase disabled:opacity-40"
+            >
+              {ending ? 'Closing…' : positions.length > 0 ? `End & Close ${positions.length}` : 'End Session'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="border-term-border flex flex-col gap-2 border-b p-3">
         <div className="flex items-center gap-2">

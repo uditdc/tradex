@@ -1,6 +1,6 @@
 import { LEDGER_STORE, withStore } from './db'
 
-export type CloseReason = 'manual' | 'stop_loss' | 'take_profit' | 'bot'
+export type CloseReason = 'manual' | 'stop_loss' | 'take_profit' | 'bot' | 'session_end'
 
 /** One realized close (manual or SL/TP-triggered), booked for the running paper-portfolio ledger. */
 export interface LedgerEntry {

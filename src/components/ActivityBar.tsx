@@ -3,7 +3,7 @@ import { useAppStore } from '../store'
 import type { BotLogEntry } from '../store'
 import { useIndicators } from '../hooks/useIndicators'
 import type { BotDecision, BotScenario, StrategyId } from '../lib/ai/bot'
-import { metaAndAssetCtxs } from '../lib/hl/rest'
+import { resolveClosePrice } from '../lib/closePosition'
 import { computePositionVerdict, formatSignedUsd, livePriceForPosition, pnlForPosition } from '../lib/sim'
 import type { Verdict } from '../lib/sim'
 import type { SimPosition } from '../lib/storage/positions'
@@ -82,28 +82,16 @@ function PositionsTab() {
   })
   const totalPnl = positionRows.reduce((sum, r) => sum + (r.pnl ?? 0), 0)
 
-  /**
-   * Closes a position at the live price if one's already available (active coin or
-   * watchlist). Otherwise fetches a one-off real price so a manual close always
-   * books real realized PnL instead of silently dropping the position with nothing
-   * booked to the ledger.
-   */
   async function handleClose(position: SimPosition, liveCur: number | null) {
     let exitPrice = liveCur
     if (exitPrice === null) {
       setClosingIds((prev) => new Set(prev).add(position.id))
-      try {
-        const ctx = await metaAndAssetCtxs(position.coin)
-        exitPrice = ctx.markPx
-      } catch (err) {
-        console.error(`Failed to fetch a close price for ${position.coin}:`, err)
-      } finally {
-        setClosingIds((prev) => {
-          const next = new Set(prev)
-          next.delete(position.id)
-          return next
-        })
-      }
+      exitPrice = await resolveClosePrice(position, coin, activePrice, watchlistData)
+      setClosingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(position.id)
+        return next
+      })
     }
     closePosition(position.id, exitPrice, 'manual')
   }

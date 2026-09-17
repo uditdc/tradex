@@ -20,6 +20,7 @@ const CLOSE_REASON_LABELS: Record<CloseReason, string> = {
   stop_loss: 'Stop-loss hit',
   take_profit: 'Take-profit hit',
   bot: 'Bot flipped',
+  session_end: 'Session ended',
 }
 
 export interface WatchlistEntry {

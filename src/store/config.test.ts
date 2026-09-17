@@ -8,6 +8,8 @@ beforeEach(() => {
     defaultInterval: '1h',
     lookback: 210,
     botEnabled: false,
+    sessionStartedAt: null,
+    activeStrategy: 'momentum',
   })
 })
 
@@ -37,11 +39,19 @@ describe('useConfigStore', () => {
     expect(useConfigStore.getState().lookback).toBe(300)
   })
 
-  it('toggleBot flips botEnabled, off by default', () => {
+  it('startSession/endSession flip botEnabled, off by default', () => {
     expect(useConfigStore.getState().botEnabled).toBe(false)
-    useConfigStore.getState().toggleBot()
+    useConfigStore.getState().startSession()
     expect(useConfigStore.getState().botEnabled).toBe(true)
-    useConfigStore.getState().toggleBot()
+    useConfigStore.getState().endSession()
     expect(useConfigStore.getState().botEnabled).toBe(false)
+  })
+
+  it('startSession records when the session started; endSession clears it', () => {
+    expect(useConfigStore.getState().sessionStartedAt).toBeNull()
+    useConfigStore.getState().startSession()
+    expect(useConfigStore.getState().sessionStartedAt).not.toBeNull()
+    useConfigStore.getState().endSession()
+    expect(useConfigStore.getState().sessionStartedAt).toBeNull()
   })
 })

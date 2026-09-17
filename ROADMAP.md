@@ -1151,6 +1151,42 @@ Notes:
 - `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 99 passed (6 new for
   `computeOrderBookMetrics`).
 
+## Phase 20 — Explicit Start/End Session, persisted, close-all on end
+- [x] Replaced the single On/Off toggle in `AiPanel` with explicit "Start
+  Session" / "End Session" buttons. Jev was already only ever called while
+  `botEnabled` was true (`useTradingBot`'s poll loop is gated on it) — this
+  phase makes that boundary an explicit user action instead of an implicit
+  side effect of a generic toggle, and the session's existence is now visible
+  (elapsed-time readout) rather than just a binary on/off pill.
+- [x] `useConfigStore` gained `sessionStartedAt: number | null` alongside
+  `botEnabled` (both already persisted via the existing `zustand/persist` to
+  `localStorage` under `hl-term-config` — no new persistence mechanism
+  needed, `botEnabled` was already surviving a tab close before this phase).
+  `toggleBot` replaced with `startSession()`/`endSession()`. `AiPanel`'s
+  status line now shows a live elapsed-time readout (`formatElapsed`) next
+  to the existing watching/analyzing text, so a resumed session visibly
+  shows how long it's actually been running, not just that it's on.
+- [x] Ending a session opens a confirm dialog (shadcn's `components/ui/dialog.tsx`,
+  already in the repo, previously unused outside `CommandPalette`) — "End
+  trading session?" with a count of open positions that will be closed, or a
+  plain "no open positions" message when there are none. Confirming closes
+  every open position (across all coins, not just the active one) at the
+  best available price, then stops the session; Cancel leaves everything
+  running.
+- [x] New `resolveClosePrice` (`lib/closePosition.ts`) extracts the
+  live-price-or-fetch fallback that `ActivityBar`'s manual per-position close
+  already had, now shared by both the manual close button and bulk
+  end-of-session close instead of being duplicated.
+- [x] New `CloseReason` value `session_end` ("Session ended") distinguishes
+  session-triggered closes from a manual per-position close in the trade
+  history.
+- Not visually verified in a browser — no browser-automation tool available
+  this session (same limitation as Phase 17). No new server/Jev call is
+  involved in this phase, so no live-API verification was needed either.
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 100 passed (2 new
+  for `startSession`/`endSession` and `sessionStartedAt` in
+  `config.test.ts`, one existing `toggleBot` test updated).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

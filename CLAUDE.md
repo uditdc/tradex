@@ -18,6 +18,16 @@ every close is booked to a realized-PnL ledger (trade history, session PnL). The
 other AI provider in this app — no narrative LLM, no "AI read," no "/" ask mode; those
 were removed. Jev (`/api/bot-decision`) is the only model call this app ever makes.
 
+A trading **session** is just Auto Mode being on: explicit Start Session / End Session
+buttons in `AiPanel` (`useConfigStore`'s `botEnabled` + `sessionStartedAt`, both
+persisted — a reloaded tab resumes a running session rather than silently dropping
+it, and `useTradingBot`'s poll loop, and therefore every Jev call, only ever runs
+while a session is active). Ending a session opens a confirm dialog
+(`components/ui/dialog.tsx`) that closes every open position at the best available
+price (`resolveClosePrice`, `lib/closePosition.ts` — live price if on hand, else a
+one-off Hyperliquid fetch, same fallback `ActivityBar`'s manual close already used)
+before actually stopping the loop, booked to the ledger with reason `session_end`.
+
 Indicators (bias, RSI, ATR%, volume ratio, swing support/resistance, regime — see
 "Indicator block (v1 scope)") are still computed deterministically every tick; there is
 no dedicated visual panel for them (dropped in Phase 6 to match the imported design),
@@ -65,6 +75,7 @@ src/
   lib/strategies/types.ts  # StrategyId + picker metadata only — see "Strategies" below
   lib/ai/bot.ts        # Client for /api/bot-decision (Jev) — the only AI call in the app
   lib/sim.ts           # Pure paper-position PnL/verdict/bot-policy helpers. No I/O. Tested.
+  lib/closePosition.ts # resolveClosePrice: live price, else a one-off Hyperliquid fetch. I/O, not pure.
   lib/storage/         # IndexedDB: paper positions, realized-PnL ledger (trade history)
   hooks/               # useCandles, useIndicators, useTradingBot, ...
   components/          # TopBar, ChartPanel, AiPanel, ActivityBar, CommandPalette, Watchlist
