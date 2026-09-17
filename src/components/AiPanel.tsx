@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { BotDecision, BotScenario, FactorScore } from '../lib/ai/bot'
+import { STRATEGIES } from '../lib/strategies/types'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
 
@@ -104,6 +105,8 @@ export function AiPanel() {
   const botAnalyzing = useAppStore((s) => s.botAnalyzing)
   const botEnabled = useConfigStore((s) => s.botEnabled)
   const toggleBot = useConfigStore((s) => s.toggleBot)
+  const activeStrategy = useConfigStore((s) => s.activeStrategy)
+  const setActiveStrategy = useConfigStore((s) => s.setActiveStrategy)
 
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -129,7 +132,10 @@ export function AiPanel() {
         />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[11px] font-semibold tracking-widest text-[#F5F0E6]">
-            JEV <span className="text-term-muted font-normal">· AUTO MODE</span>
+            JEV{' '}
+            <span className="text-term-muted font-normal">
+              · AUTO MODE · {STRATEGIES.find((s) => s.id === activeStrategy)?.label.toUpperCase()}
+            </span>
           </span>
           <span className={`flex items-center gap-0.5 text-[10px] ${statusClass}`}>
             {statusText}
@@ -145,6 +151,29 @@ export function AiPanel() {
         >
           {botEnabled ? 'On' : 'Off'}
         </button>
+      </div>
+
+      <div className="border-term-border flex flex-col gap-2 border-b p-3">
+        <div className="flex items-center gap-2">
+          <span className="text-term-muted w-8 shrink-0 text-[10px]">Strategy</span>
+          <div className="flex flex-1 gap-1">
+            {STRATEGIES.map((strategy) => (
+              <button
+                key={strategy.id}
+                type="button"
+                onClick={() => setActiveStrategy(strategy.id)}
+                title={strategy.description}
+                className={`flex-1 rounded-sm border px-1.5 py-1 text-[10px] tracking-wide uppercase ${
+                  activeStrategy === strategy.id
+                    ? 'border-term-amber text-term-amber'
+                    : 'border-term-border text-term-muted'
+                }`}
+              >
+                {strategy.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="border-term-border flex flex-col gap-2 border-b p-3">
@@ -228,12 +257,9 @@ export function AiPanel() {
               <div className="flex flex-col gap-2 p-3">
                 <span className="text-term-muted text-[10px] tracking-widest uppercase">Why</span>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                  <FactorRow label="Trend" kind="directional" factor={botStatus.factors.trend} />
-                  <FactorRow label="Volatility" kind="conviction" factor={botStatus.factors.volatility} />
-                  <FactorRow label="Momentum" kind="directional" factor={botStatus.factors.momentum} />
-                  <FactorRow label="Volume" kind="conviction" factor={botStatus.factors.volume} />
-                  <FactorRow label="Levels" kind="directional" factor={botStatus.factors.levels} />
-                  <FactorRow label="Regime" kind="conviction" factor={botStatus.factors.regime} />
+                  {botStatus.factors.map((factor) => (
+                    <FactorRow key={factor.key} label={factor.label} kind={factor.kind} factor={factor} />
+                  ))}
                 </div>
               </div>
             </>

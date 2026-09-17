@@ -1102,6 +1102,55 @@ Notes:
   `computeStopLossTakeProfit`: tight/normal/wide buffer math, score clamping,
   and the undefined-when-no-swing-level case).
 
+## Phase 19 — Pluggable Jev strategies: Momentum + Order Book Pressure
+- [x] `/api/bot-decision` request gained `strategy: 'momentum' | 'orderbook'`
+  (route 400s on an unknown value) and `orderBook` (only meaningful for
+  `orderbook`); `indicators` is still always sent since every strategy anchors
+  SL/TP to swing levels regardless of what else it looks at.
+- [x] `server/index.ts` is now a thin dispatcher: look up
+  `STRATEGIES[strategy]` (`server/strategies/momentum.ts` /
+  `server/strategies/orderbook.ts`), call its `buildQuestions()`, run one
+  `systemOne` call, shape the response from its `factorMeta`. Momentum's
+  question wording is unchanged from Phase 18, just moved out of `index.ts`.
+- [x] Response's `factors` changed from a fixed 6-key object to a generic
+  `{ key, label, kind, score, confidence }[]` — momentum still sends 6 entries,
+  `orderbook` sends 3 (`imbalance`, `spread`, `depth`). `scenario`/`action`/
+  `riskWidth` stay universal (same meaning, different wording) across
+  strategies, since `decideBotAction` and `computeStopLossTakeProfit` only key
+  off those, never off individual factors.
+- [x] New `computeOrderBookMetrics` (`lib/indicators/orderbook.ts`, pure,
+  tested — 6 new cases) computes imbalance/spread/depth-ratio from a live
+  `l2Book` snapshot; `useTradingBot` fetches it only when
+  `activeStrategy === 'orderbook'` and passes the latest candle close as the
+  mid-price proxy (avoids a second Hyperliquid round trip just for `midPx`).
+- [x] `AiPanel` gained a Strategy picker (two pills next to the sliders) and
+  shows the active strategy in the header; the "Why" section now maps over
+  `botStatus.factors` generically instead of 6 hardcoded rows —
+  `FactorRow` needed no changes, it already took `label`/`kind`/`factor` as
+  props. `ActivityBar`'s Jev Call Log gained a Strategy column (`MOM`/`BOOK`)
+  so history stays legible once two strategies exist.
+- [x] Switching `activeStrategy` (persisted, `useConfigStore`) while Auto Mode
+  is on restarts `useTradingBot`'s poll loop immediately, the same mechanism
+  already used for switching coin (`activeStrategy` added to the effect's
+  dependency array).
+- Verified against the real TypeSafe API key (user's `pnpm dev` had stopped
+  since the last phase — started a temporary `dev:server`, verified, confirmed
+  via `ps`/timestamp it was the process I'd started, then killed it): momentum
+  reproduced the same shape/values as Phase 18 after the refactor; orderbook
+  with a strongly bid-heavy/tight/deep synthetic book (`imbalance: 0.72,
+  spreadPercent: 0.03, depthRatio: 4.5`) returned `imbalance: 2.91` (bullish
+  side of neutral) and high-conviction `spread`/`depth` scores; flipping to a
+  strongly ask-heavy/thin book (`imbalance: -0.85, depthRatio: 1.1`) correctly
+  dropped `imbalance` to 1.27 (bearish side) and `depth` to 0.65 (low
+  conviction). One honest miss: `spreadPercent` going from 0.03% to 0.45%
+  (15x wider) barely moved the `spread` score (1.95 → 1.73) — the rubric's
+  "relative to typical" wording doesn't give the model a hard reference point,
+  the same class of imprecision the existing ATR/volatility rubric already
+  has. Not fixed in this phase; worth tightening the rubric with concrete
+  numeric bands if it matters in practice.
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 99 passed (6 new for
+  `computeOrderBookMetrics`).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)
@@ -1114,3 +1163,13 @@ Notes:
   only runs while a browser tab has the app mounted (see `useTradingBot`); moving
   it server-side needs its own durable storage (IndexedDB isn't reachable from
   Node) — raised, not started
+- A third strategy — e.g. Funding & Open Interest (`metaAndAssetCtxs`, already
+  fetched elsewhere in the app but not fed to the bot) for a carry/crowding read
+  instead of a price-structure or book-pressure one (Phase 19 added the second
+  strategy, Order Book Pressure)
+- Tighten the `orderbook` strategy's `spread` rubric with concrete numeric bands
+  (e.g. "< 0.05%" / "0.05–0.2%" / "> 0.2%") instead of "relative to typical" —
+  Phase 19's live verification showed a 15x wider spread barely moved the score
+- Run more than one strategy per coin at once and compare/ensemble their reads,
+  or let `scenario` (once multiple strategies exist) gate which strategy even
+  runs for a given ticker

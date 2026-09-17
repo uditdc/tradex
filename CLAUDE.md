@@ -60,18 +60,20 @@ stop-loss/take-profit (nearest swing support/resistance).
 
 ```
 src/
-  lib/hl/          # REST snapshot, WS candle subscription, candle buffer. No React.
-  lib/indicators/  # Pure functions: candles in, numbers out. No I/O. Fully tested.
-  lib/ai/bot.ts    # Client for /api/bot-decision (Jev) — the only AI call in the app
-  lib/sim.ts       # Pure paper-position PnL/verdict/bot-policy helpers. No I/O. Tested.
-  lib/storage/     # IndexedDB: paper positions, realized-PnL ledger (trade history)
-  hooks/           # useCandles, useIndicators, useTradingBot, ...
-  components/      # TopBar, ChartPanel, AiPanel, ActivityBar, CommandPalette, Watchlist
+  lib/hl/              # REST snapshot, WS candle subscription, candle buffer. No React.
+  lib/indicators/      # Pure functions: candles/book in, numbers out. No I/O. Fully tested.
+  lib/strategies/types.ts  # StrategyId + picker metadata only — see "Strategies" below
+  lib/ai/bot.ts        # Client for /api/bot-decision (Jev) — the only AI call in the app
+  lib/sim.ts           # Pure paper-position PnL/verdict/bot-policy helpers. No I/O. Tested.
+  lib/storage/         # IndexedDB: paper positions, realized-PnL ledger (trade history)
+  hooks/               # useCandles, useIndicators, useTradingBot, ...
+  components/          # TopBar, ChartPanel, AiPanel, ActivityBar, CommandPalette, Watchlist
   App.tsx
 server/
-  index.ts         # Hono: /api/bot-decision (TypeSafe), optional /api/hl proxy
+  index.ts             # Hono: /api/bot-decision dispatches to a strategy module, optional /api/hl proxy
+  strategies/           # One module per strategy: its Jev question set + factor metadata
 scripts/
-  probe.ts         # tsx script: print candles + funding/OI for a coin, no UI
+  probe.ts             # tsx script: print candles + funding/OI for a coin, no UI
 ```
 
 - `lib/hl` and `lib/indicators` must run in a plain `tsx` script with no DOM. That is
@@ -92,32 +94,67 @@ lookback, one-word regime tag (trending / ranging / compressing). Computed by
 auto-trading bot's own stop-loss/take-profit calculation, not rendered as its own
 panel (see "What this is").
 
+## Strategies
+
+Auto Mode runs one **strategy** at a time, picked in `AiPanel` (persisted as
+`activeStrategy` in `useConfigStore`) and applied on the next poll — switching
+strategy while Auto Mode is on restarts `useTradingBot`'s poll loop for the new
+strategy immediately, the same way switching coin already does. A strategy decides
+two things: what extra data `useTradingBot` pulls from Hyperliquid beyond the base
+candle indicators (always fetched — every strategy still anchors stop-loss/take-profit
+to swing levels), and which Jev question set `server/strategies/<id>.ts` builds from
+it. `lib/strategies/types.ts` is metadata only (`StrategyId`, label, description for
+the picker) — the actual per-strategy fetch branch lives directly in
+`useTradingBot.ts`; with just two strategies, a separate "gatherer" abstraction isn't
+earning its keep yet.
+
+- **`momentum`** (default): candle-derived indicators only (EMA 9/21/55 stack, RSI
+  14, ATR%, volume ratio, swing support/resistance, regime tag) — unchanged from the
+  original single-strategy bot.
+- **`orderbook`**: live bid/ask depth from `l2Book`, reduced client-side to
+  `computeOrderBookMetrics` (`lib/indicators/orderbook.ts`, pure, tested) —
+  `imbalance` (bid vs. ask depth within ±0.5% of mid), `spreadPercent`, `depthRatio`
+  (total window depth vs. top-of-book size). Still receives the base `indicators` too,
+  for swing-level SL/TP anchoring and price-structure context.
+
+Adding a third strategy: add its id to `StrategyId` (`lib/strategies/types.ts`) and
+`STRATEGIES` (both there and `server/index.ts`'s `STRATEGIES` map), a
+`server/strategies/<id>.ts` exporting `buildQuestions()`, and — only if it needs data
+beyond `indicators` — a branch in `useTradingBot.ts`'s fetch and a new optional field
+on the request body (`lib/ai/bot.ts`'s `requestBotDecision`).
+
 ## Bot-decision contract (`/api/bot-decision`)
 
-Input: symbol, the full indicator dict, and — only if one exists — the currently held
-paper position on that coin (side, entry price, live unrealized PnL). Output: two
-independent Jev `choice()` judgments asked in the same call over the same state —
-each shaped `{ choice, confidence, probabilities }`:
+Input: `strategy` (`StrategyId`), symbol, the full base indicator dict (always sent —
+see "Strategies"), `orderBook` (only meaningful for the `orderbook` strategy), and —
+only if one exists — the currently held paper position on that coin (side, entry
+price, live unrealized PnL). The route (`server/index.ts`) is a thin dispatcher: look
+up `STRATEGIES[strategy]`, call its `buildQuestions()` for the Jev question set, run
+one `systemOne` call, then shape the generic response below from `factorMeta`. Output:
 
 - `scenario`: `"bull" | "bear" | "neutral"` — a ticker-level read on whether this
   coin is worth considering for a trade at all, independent of any specific action.
   Currently display-only (the AI panel's "Scenario" line and call log); it does not
-  yet gate `action`.
+  yet gate `action`. Same three-way choice across every strategy, worded to reference
+  whatever that strategy actually looks at.
 - `action`: `"buy" | "sell" | "hold"` — the trade action for the (currently single)
   open position on this coin. `decideBotAction` (`lib/sim.ts`) is the only place
   that turns `action` into an open/close call; keep policy (confidence gating,
-  side-matching) there as plain code, not another model question.
-- `factors`: a per-parameter breakdown explaining *why* — one Jev `score()`
-  question per indicator, each `{ score, confidence }`. `trend` (EMA 9/21/55
-  stack), `momentum` (RSI 14), and `levels` (swing support/resistance proximity)
-  are directional, scored 0–4 (0 = strongly bearish, 4 = strongly bullish) — they
-  explain which way `scenario` leans. `volatility` (ATR%), `volume` (vs. 20-bar
-  average), and `regime` are conviction-only, scored 0–2 (0 = low, 2 = high) —
-  these indicators don't have a direction of their own, they say how much to trust
-  whatever direction the directional factors point in. The rubric wording lives
-  only in `server/index.ts`; the client (`AiPanel`'s `DIRECTIONAL_LABELS`/
-  `CONVICTION_LABELS`) renders scores against its own short labels by the same
-  index order, kept in sync by hand rather than sent over the wire.
+  side-matching) there as plain code, not another model question — this is why
+  `action`'s meaning stays identical across strategies even though the data behind
+  it doesn't.
+- `factors`: `{ key, label, kind, score, confidence }[]` — a per-parameter
+  breakdown explaining *why*, one Jev `score()` question per data point the active
+  strategy looks at. Which factors exist is strategy-defined (`factorMeta` in each
+  `server/strategies/<id>.ts` module); `kind: 'directional'` means the score is
+  0–4 (0 = strongly bearish, 4 = strongly bullish) and explains which way
+  `scenario` leans, `kind: 'conviction'` means 0–2 (0 = low, 2 = high) and explains
+  how much to trust the directional read — that data point doesn't have a
+  direction of its own. The rubric wording (and each factor's `label`) lives only
+  in the strategy module; the client (`AiPanel`'s `FactorRow`) renders whatever
+  list comes back generically, picking `DIRECTIONAL_LABELS`/`CONVICTION_LABELS`
+  by `kind` alone — every strategy's factors use one of these two fixed scales, so
+  the client never needs per-strategy label tables.
 - `riskWidth`: `{ score, confidence }`, a Jev `score()` question scored 0–2
   (0 = tight, 2 = wide) on how much room a stop-loss/take-profit should give the
   trade relative to the nearest swing support/resistance. Unlike `factors`, this
@@ -131,10 +168,14 @@ each shaped `{ choice, confidence, probabilities }`:
   price math stays in code and Jev only steers the risk-width input to it.
 
 No prose, no parsing needed — these are typed judgments, not a completion to
-strict-parse. All nine questions (`scenario`, `action`, six factors,
-`riskWidth`) are asked together in one call — independent questions, same
-state — rather than as separate requests, per TypeSafe's guidance on composing
-judgments.
+strict-parse. Every strategy's full question set (`scenario`, `action`,
+`riskWidth`, plus its factors) is asked together in one `systemOne` call —
+independent questions, same state — rather than as separate requests, per
+TypeSafe's guidance on composing judgments. Because the question set is only
+known at request time (the caller picks a strategy), the route reads back
+`scenario`/`action`/`riskWidth`/each factor answer with a few narrow, deliberate
+type casts rather than the fully-inferred per-key typing a single fixed question
+set could have — see the comment in `server/index.ts`.
 
 ## Design direction (locked — do not re-invent per session)
 

@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { requestBotDecision } from '../lib/ai/bot'
 import { intervalMs } from '../lib/hl/intervals'
-import { candleSnapshot } from '../lib/hl/rest'
+import { candleSnapshot, l2Book } from '../lib/hl/rest'
 import { MIN_CANDLES, computeAll } from '../lib/indicators'
+import { computeOrderBookMetrics } from '../lib/indicators/orderbook'
 import { computeStopLossTakeProfit, decideBotAction, pnlForPosition } from '../lib/sim'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
@@ -26,6 +27,7 @@ const BOT_LOOKBACK = 210
  */
 export function useTradingBot(): void {
   const botEnabled = useConfigStore((s) => s.botEnabled)
+  const activeStrategy = useConfigStore((s) => s.activeStrategy)
   const coin = useAppStore((s) => s.coin)
   const lastOpenTimeRef = useRef<number | undefined>(undefined)
   // Tracks whether the last decision request failed, so a persistent failure (e.g. no
@@ -52,6 +54,17 @@ export function useTradingBot(): void {
 
         const indicators = computeAll(candles)
         const activePrice = latest.close
+
+        let orderBook = null
+        if (activeStrategy === 'orderbook') {
+          try {
+            orderBook = computeOrderBookMetrics(await l2Book(coin), activePrice)
+          } catch (err) {
+            console.error(`trading bot: failed to fetch order book for ${coin}:`, err)
+            return
+          }
+        }
+
         const {
           positions,
           openPosition,
@@ -68,8 +81,10 @@ export function useTradingBot(): void {
         setBotAnalyzing(true)
         try {
           result = await requestBotDecision(
+            activeStrategy,
             coin,
             indicators,
+            orderBook,
             held ? { side: held.side, entryPrice: held.entryPrice, unrealizedPnl: pnlForPosition(held, activePrice) } : null,
           )
         } catch (err) {
@@ -123,5 +138,5 @@ export function useTradingBot(): void {
       cancelled = true
       clearInterval(timer)
     }
-  }, [botEnabled, coin])
+  }, [botEnabled, coin, activeStrategy])
 }

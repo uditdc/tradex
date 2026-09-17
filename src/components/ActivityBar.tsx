@@ -2,13 +2,18 @@ import { useState } from 'react'
 import { useAppStore } from '../store'
 import type { BotLogEntry } from '../store'
 import { useIndicators } from '../hooks/useIndicators'
-import type { BotDecision, BotScenario } from '../lib/ai/bot'
+import type { BotDecision, BotScenario, StrategyId } from '../lib/ai/bot'
 import { metaAndAssetCtxs } from '../lib/hl/rest'
 import { computePositionVerdict, formatSignedUsd, livePriceForPosition, pnlForPosition } from '../lib/sim'
 import type { Verdict } from '../lib/sim'
 import type { SimPosition } from '../lib/storage/positions'
 
 type Tab = 'positions' | 'history' | 'log'
+
+const STRATEGY_ABBR: Record<StrategyId, string> = {
+  momentum: 'MOM',
+  orderbook: 'BOOK',
+}
 
 const BOT_DECISION_CLASS: Record<BotDecision, string> = {
   buy: 'text-term-up',
@@ -242,9 +247,10 @@ function HistoryTab() {
 
 function LogRow({ entry }: { entry: BotLogEntry }) {
   return (
-    <div className="border-term-border/60 grid grid-cols-[70px_50px_80px_1fr_50px_100px] items-center gap-2 border-b py-1 text-[11px] tabular-nums">
+    <div className="border-term-border/60 grid grid-cols-[70px_50px_50px_80px_1fr_50px_100px] items-center gap-2 border-b py-1 text-[11px] tabular-nums">
       <span className="text-term-muted">{fmtClock(entry.timestamp)}</span>
       <span className="text-[#F5F0E6]">{entry.coin}</span>
+      <span className="text-term-muted">{STRATEGY_ABBR[entry.strategy]}</span>
       <span className={`font-semibold ${BOT_SCENARIO_CLASS[entry.scenario.choice]}`}>
         {entry.scenario.choice.slice(0, 4).toUpperCase()}
       </span>
@@ -269,9 +275,10 @@ function LogTab() {
 
   return (
     <div className="flex flex-col">
-      <div className="text-term-muted grid grid-cols-[70px_50px_80px_1fr_50px_100px] gap-2 pb-1 text-[9px] tracking-widest uppercase">
+      <div className="text-term-muted grid grid-cols-[70px_50px_50px_80px_1fr_50px_100px] gap-2 pb-1 text-[9px] tracking-widest uppercase">
         <span>Time</span>
         <span>Coin</span>
+        <span>Strat</span>
         <span>Scenario</span>
         <span>Call</span>
         <span className="text-right">Conf</span>
