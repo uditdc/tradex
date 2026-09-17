@@ -1,12 +1,40 @@
 import { useEffect, useState } from 'react'
+import type { FactorScore } from '../lib/ai/bot'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
 
 const BOT_DECISION_CLASS: Record<string, string> = { buy: 'text-term-up', sell: 'text-term-down', hold: 'text-term-muted' }
 const BOT_SCENARIO_CLASS: Record<string, string> = { bull: 'text-term-up', bear: 'text-term-down', neutral: 'text-term-muted' }
 
+// Same index semantics as the rubrics `server/index.ts` sends Jev — kept in sync by hand, not over the wire.
+const DIRECTIONAL_LABELS = ['Strong Bear', 'Bear', 'Neutral', 'Bull', 'Strong Bull']
+const CONVICTION_LABELS = ['Low', 'Moderate', 'High']
+
 function fmtClock(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-US', { hour12: false })
+}
+
+/** `trend`/`momentum`/`levels` have a direction (bear↔bull); `volatility`/`volume`/`regime` only have conviction (low↔high). */
+function FactorRow({ label, kind, factor }: { label: string; kind: 'directional' | 'conviction'; factor: FactorScore }) {
+  const labels = kind === 'directional' ? DIRECTIONAL_LABELS : CONVICTION_LABELS
+  const idx = Math.max(0, Math.min(labels.length - 1, Math.round(factor.score)))
+  const mid = (labels.length - 1) / 2
+  const colorClass =
+    kind === 'directional'
+      ? idx > mid
+        ? 'text-term-up'
+        : idx < mid
+          ? 'text-term-down'
+          : 'text-term-muted'
+      : idx === labels.length - 1
+        ? 'text-term-amber'
+        : 'text-term-muted'
+  return (
+    <div className="flex items-center justify-between gap-1">
+      <span className="text-term-muted">{label}</span>
+      <span className={colorClass}>{labels[idx]}</span>
+    </div>
+  )
 }
 
 /** Seconds left until the next wall-clock minute boundary — when `useTradingBot` next polls a closed 1m bar. */
@@ -110,6 +138,17 @@ export function AiPanel() {
                     <span>buy {Math.round(botStatus.action.probabilities.buy * 100)}%</span>
                     <span>sell {Math.round(botStatus.action.probabilities.sell * 100)}%</span>
                     <span>hold {Math.round(botStatus.action.probabilities.hold * 100)}%</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-term-muted text-[10px] tracking-widest uppercase">Why</span>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+                    <FactorRow label="Trend" kind="directional" factor={botStatus.factors.trend} />
+                    <FactorRow label="Volatility" kind="conviction" factor={botStatus.factors.volatility} />
+                    <FactorRow label="Momentum" kind="directional" factor={botStatus.factors.momentum} />
+                    <FactorRow label="Volume" kind="conviction" factor={botStatus.factors.volume} />
+                    <FactorRow label="Levels" kind="directional" factor={botStatus.factors.levels} />
+                    <FactorRow label="Regime" kind="conviction" factor={botStatus.factors.regime} />
                   </div>
                 </div>
               </div>

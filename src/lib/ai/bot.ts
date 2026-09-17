@@ -9,16 +9,41 @@ export interface Judgment<T extends string> {
   probabilities: Record<T, number>
 }
 
+/** One scored indicator behind `scenario`/`action` — a Jev Score question's expected value and confidence. */
+export interface FactorScore {
+  score: number
+  confidence: number
+}
+
+/**
+ * Per-parameter breakdown behind `scenario`/`action`, one Score question per
+ * indicator. `trend`/`momentum`/`levels` are directional (0 = strongly bearish,
+ * 4 = strongly bullish) — they explain *which way* `scenario` leans.
+ * `volatility`/`volume`/`regime` are conviction-only (0 = low, 2 = high) — these
+ * indicators don't have a direction of their own, they say how much to trust
+ * whatever direction the directional factors point in.
+ */
+export interface BotFactors {
+  trend: FactorScore
+  momentum: FactorScore
+  levels: FactorScore
+  volatility: FactorScore
+  volume: FactorScore
+  regime: FactorScore
+}
+
 /**
  * Jev's per-tick output on a coin: a ticker-level scenario (is this coin worth
- * considering for a trade at all) and a trade action (what to do with the — for
- * now, single — open position on it). Two independent questions in one call so
- * `scenario` can later gate which tickers get evaluated without changing how
- * `action` drives a specific trade.
+ * considering for a trade at all), a trade action (what to do with the — for
+ * now, single — open position on it), and the per-parameter factor breakdown
+ * behind both. Independent questions in one call so `scenario` can later gate
+ * which tickers get evaluated without changing how `action` drives a specific
+ * trade.
  */
 export interface BotDecisionResult {
   scenario: Judgment<BotScenario>
   action: Judgment<BotDecision>
+  factors: BotFactors
 }
 
 export interface BotPositionContext {

@@ -995,6 +995,45 @@ Notes:
 - Deliberately not built yet: multiple concurrent open trades per ticker (single
   trade per ticker still holds — see parking lot).
 
+## Phase 16 — Explain the decision: per-parameter Jev `score()` breakdown
+- [x] `/api/bot-decision` gained six more Jev questions, asked in the same call
+  alongside `scenario`/`action` (eight independent questions total, one request):
+  `trend`, `momentum`, `levels` (directional, `score()` on a 5-point bearish→
+  bullish rubric, index 0–4) and `volatility`, `volume`, `regime` (conviction-only,
+  `score()` on a 3-point low→high rubric, index 0–2 — these indicators don't have
+  a direction of their own, they say how much to trust whichever way the
+  directional factors point). Rubric levels are concrete, hand-written sentences
+  per TypeSafe's guidance ("levels must describe concrete situations and stand on
+  their own"), not bare adjectives.
+- [x] Response gained `factors: { trend, momentum, levels, volatility, volume,
+  regime }`, each `{ score, confidence }` — deliberately dropped Jev's own
+  `legend`/`probabilities` from the wire response; the client renders scores
+  against its own short labels (`DIRECTIONAL_LABELS`/`CONVICTION_LABELS` in
+  `AiPanel.tsx`) by the same index order the server's rubrics use, kept in sync by
+  hand rather than sent over the wire on every tick.
+- [x] `AiPanel` gained a "Why" section under the Scenario/Action block: a compact
+  2-column grid of the six factors, each rendered as a short qualitative label
+  (Strong Bear/Bear/Neutral/Bull/Strong Bull, or Low/Moderate/High) colored the
+  same up/down/muted (directional) or muted/amber (conviction) as the rest of the
+  app — not a new numeric-bar widget, to stay legible at the sidebar's existing
+  10px scale. Left the Jev call log untouched (scenario+action only, no factors)
+  — the log is a scannable history, not a live explanation, and six extra values
+  per row would make it unreadable at that width.
+- `BotDecisionResult`/`BotStatus`/`BotLogEntry` all picked up `factors` for free
+  (they compose the same type), so every logged tick already carries its own
+  factor breakdown even though the UI only surfaces the latest one.
+- Verified against the real TypeSafe API key (temporarily started just
+  `dev:server` again, killed it right after): a bullish HYPE indicator set (EMA
+  stack up, RSI 62.3, price roughly mid-range between support/resistance, ATR
+  1.8%, volume 1.4x, trending regime) returned `trend: 3.06`, `momentum: 3`,
+  `levels: 2.32`, `volatility: 0.83`, `volume: 1.97`, `regime: 2` — every factor
+  landed where the hand-verified inputs predicted (trend/momentum clearly bullish,
+  levels near-neutral since price wasn't close to either boundary, volume/regime
+  high-conviction, volatility only moderate) — confirms the rubrics are being
+  read correctly, not just returning plausible-looking noise.
+- `pnpm typecheck`/`test` (88 passed, no test changes needed — nothing existing
+  asserted on `BotDecisionResult`'s exact shape)/`lint`/`build` all green.
+
 ---
 
 ## Parking lot (ideas, not commitments)

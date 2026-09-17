@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server'
-import { TypeSafeClient, choice } from '@typesafe-ai/sdk'
+import { TypeSafeClient, choice, score } from '@typesafe-ai/sdk'
 import { Hono } from 'hono'
 
 // The trading bot is opt-in (off by default), so a missing key doesn't block the
@@ -7,6 +7,54 @@ import { Hono } from 'hono'
 const typesafeClient = process.env.TYPESAFE_API_KEY ? new TypeSafeClient() : null
 
 const app = new Hono()
+
+// Directional rubrics (index 0 = strongly bearish ... 4 = strongly bullish) — explain
+// `scenario`/`action`'s directional lean, one per indicator that actually has a
+// bearish/bullish reading.
+const TREND_RUBRIC = [
+  'EMAs stacked bearish (9 below 21 below 55) and price trading below all three — strong downtrend structure.',
+  'EMAs mixed with a bearish lean — price below the 21/55 EMAs but the stack not fully bearish.',
+  'EMAs tangled or flat — price chopping around the moving averages, no trend structure either way.',
+  'EMAs mixed with a bullish lean — price above the 21/55 EMAs but the stack not fully bullish.',
+  'EMAs stacked bullish (9 above 21 above 55) and price trading above all three — strong uptrend structure.',
+] as const
+
+const MOMENTUM_RUBRIC = [
+  'RSI deeply oversold (below 30) — downside momentum extended, often near exhaustion.',
+  'RSI below 45 — momentum leaning bearish, not yet extreme.',
+  'RSI roughly 45-55 — momentum flat, no directional edge.',
+  'RSI above 55 — momentum leaning bullish, not yet extreme.',
+  'RSI deeply overbought (above 70) — upside momentum extended, often near exhaustion.',
+] as const
+
+const LEVELS_RUBRIC = [
+  'Price is at or breaking below nearby swing support — structure favors further downside.',
+  'Price sits closer to swing support than resistance — more room below than above, mild bearish tilt.',
+  'Price sits roughly mid-range between swing support and resistance, or no clear levels nearby.',
+  'Price sits closer to swing resistance than support — more room above than below, mild bullish tilt.',
+  'Price is at or breaking above nearby swing resistance — structure favors further upside.',
+] as const
+
+// Conviction rubrics (index 0 = low ... 2 = high) — these indicators don't have a
+// direction of their own; they say how much to trust whatever direction the
+// directional factors point in.
+const VOLATILITY_RUBRIC = [
+  'ATR% is very low relative to typical ranges — volatility compressed, moves likely small and choppy, low conviction to trade.',
+  'ATR% is moderate — a typical range, enough movement to trade with normal position sizing.',
+  'ATR% is elevated — wider-than-usual ranges, enough movement to trade with real conviction but proportionally larger risk.',
+] as const
+
+const VOLUME_RUBRIC = [
+  'Volume is well below its 20-bar average — the current move lacks participation, low conviction.',
+  'Volume is roughly in line with its 20-bar average — normal participation.',
+  'Volume is well above its 20-bar average — the current move is backed by strong participation, higher conviction.',
+] as const
+
+const REGIME_RUBRIC = [
+  'Regime is compressing — range tightening, typically a low-conviction environment to initiate new trades.',
+  'Regime is ranging — bounded back-and-forth, moderate conviction, favors range extremes over breakouts.',
+  'Regime is trending — directional continuation environment, typically the highest-conviction environment to trade with the trend.',
+] as const
 
 app.post('/api/bot-decision', async (c) => {
   if (!typesafeClient) {
@@ -42,6 +90,28 @@ app.post('/api/bot-decision', async (c) => {
             hold: 'No clear edge right now — keep any existing position as-is; do not open a new one.',
           },
         ),
+        trend: score(
+          "How does this coin's EMA 9/21/55 stack and price position read on a bearish-to-bullish scale?",
+          TREND_RUBRIC,
+        ),
+        momentum: score("How does this coin's RSI 14 read on a bearish-to-bullish momentum scale?", MOMENTUM_RUBRIC),
+        levels: score(
+          "How does this coin's price position relative to its nearest swing support/resistance read on a " +
+            'bearish-to-bullish scale?',
+          LEVELS_RUBRIC,
+        ),
+        volatility: score(
+          "How does this coin's ATR% of price (volatility) read on a low-to-high trading-conviction scale?",
+          VOLATILITY_RUBRIC,
+        ),
+        volume: score(
+          "How does this coin's volume vs. its 20-bar average read on a low-to-high participation/conviction scale?",
+          VOLUME_RUBRIC,
+        ),
+        regime: score(
+          "How does this coin's current regime tag read on a low-to-high trading-conviction scale?",
+          REGIME_RUBRIC,
+        ),
       },
     })
     return c.json({
@@ -54,6 +124,14 @@ app.post('/api/bot-decision', async (c) => {
         choice: answers.action.choice,
         confidence: answers.action.confidence,
         probabilities: answers.action.probabilities,
+      },
+      factors: {
+        trend: { score: answers.trend.score, confidence: answers.trend.confidence },
+        momentum: { score: answers.momentum.score, confidence: answers.momentum.confidence },
+        levels: { score: answers.levels.score, confidence: answers.levels.confidence },
+        volatility: { score: answers.volatility.score, confidence: answers.volatility.confidence },
+        volume: { score: answers.volume.score, confidence: answers.volume.confidence },
+        regime: { score: answers.regime.score, confidence: answers.regime.confidence },
       },
     })
   } catch (err) {

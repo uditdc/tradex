@@ -107,11 +107,22 @@ each shaped `{ choice, confidence, probabilities }`:
   open position on this coin. `decideBotAction` (`lib/sim.ts`) is the only place
   that turns `action` into an open/close call; keep policy (confidence gating,
   side-matching) there as plain code, not another model question.
+- `factors`: a per-parameter breakdown explaining *why* — one Jev `score()`
+  question per indicator, each `{ score, confidence }`. `trend` (EMA 9/21/55
+  stack), `momentum` (RSI 14), and `levels` (swing support/resistance proximity)
+  are directional, scored 0–4 (0 = strongly bearish, 4 = strongly bullish) — they
+  explain which way `scenario` leans. `volatility` (ATR%), `volume` (vs. 20-bar
+  average), and `regime` are conviction-only, scored 0–2 (0 = low, 2 = high) —
+  these indicators don't have a direction of their own, they say how much to trust
+  whatever direction the directional factors point in. The rubric wording lives
+  only in `server/index.ts`; the client (`AiPanel`'s `DIRECTIONAL_LABELS`/
+  `CONVICTION_LABELS`) renders scores against its own short labels by the same
+  index order, kept in sync by hand rather than sent over the wire.
 
 No prose, no parsing needed — these are typed judgments, not a completion to
-strict-parse. `scenario` and `action` are asked together (independent questions,
-same state) rather than as two separate requests, per TypeSafe's guidance on
-composing judgments.
+strict-parse. All eight questions (`scenario`, `action`, six factors) are asked
+together in one call — independent questions, same state — rather than as
+separate requests, per TypeSafe's guidance on composing judgments.
 
 ## Design direction (locked — do not re-invent per session)
 
