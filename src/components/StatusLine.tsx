@@ -32,6 +32,7 @@ export function StatusLine() {
   const positions = useAppStore((s) => s.positions)
   const watchlistData = useAppStore((s) => s.watchlistData)
   const realizedPnl = useAppStore((s) => s.realizedPnl)
+  const sessionPnl = useAppStore((s) => s.sessionPnl)
 
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -57,6 +58,9 @@ export function StatusLine() {
       </span>
       <span>
         Returns <span className={returnsPct >= 0 ? 'text-term-up' : 'text-term-down'}>{formatSignedPct(returnsPct)}</span>
+      </span>
+      <span>
+        Session <span className={sessionPnl >= 0 ? 'text-term-up' : 'text-term-down'}>{formatSignedUsd(sessionPnl)}</span>
       </span>
       {positions.length > 0 && (
         <span>

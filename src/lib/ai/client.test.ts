@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { requestAsk, requestRead } from './client'
+import { requestAsk } from './client'
 import type { AiContext } from './types'
 
 function jsonResponse(text: string) {
@@ -12,21 +12,8 @@ afterEach(() => {
 
 const context = { symbol: 'HYPE', interval: '1h' } as unknown as AiContext
 
-describe('requestRead / requestAsk', () => {
-  it('posts the context to /api/read and returns the response text', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse('{"bias":"long"}'))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const text = await requestRead(context)
-
-    expect(text).toBe('{"bias":"long"}')
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/read',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify(context) }),
-    )
-  })
-
-  it('requestAsk posts { context, question } to /api/ask', async () => {
+describe('requestAsk', () => {
+  it('posts { context, question } to /api/ask', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse('the trend is up'))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -44,6 +31,6 @@ describe('requestRead / requestAsk', () => {
 
   it('throws when the response is not ok', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 500 })))
-    await expect(requestRead(context)).rejects.toThrow('/api/read failed: 500')
+    await expect(requestAsk(context, 'x')).rejects.toThrow('/api/ask failed: 500')
   })
 })

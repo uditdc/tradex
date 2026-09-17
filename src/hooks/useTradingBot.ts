@@ -14,12 +14,15 @@ const POLL_MS = 15_000
 const BOT_LOOKBACK = 210
 
 /**
- * The auto-trading bot: polls the active coin's 1m candles, and on each newly closed
- * bar asks Jev (TypeSafe's fast typed judgment, via /api/bot-decision) for a
- * buy/sell/hold call, then applies `decideBotAction`'s policy against the existing
- * paper-trading engine (open/close/ledger/toasts already built in earlier phases —
- * this only decides *when* to call them, never invents a new execution path). Only
- * runs while `useConfigStore`'s `botEnabled` is on. Mount exactly once (in App.tsx).
+ * Auto Mode: polls the active coin's 1m candles, and on each newly closed bar asks
+ * Jev (TypeSafe's fast typed judgment, via /api/bot-decision) for a buy/sell/hold
+ * call, then applies `decideBotAction`'s policy against the existing paper-trading
+ * engine (open/close/ledger/toasts already built in earlier phases — this only
+ * decides *when* to call them, never invents a new execution path). `hold` is
+ * itself the "don't trade" signal — `decideBotAction`'s default confidence
+ * threshold is 0, so any real buy/sell call acts immediately, without waiting for a
+ * high-confidence setup. Only runs while `useConfigStore`'s `botEnabled` is on.
+ * Mount exactly once (in App.tsx).
  */
 export function useTradingBot(): void {
   const botEnabled = useConfigStore((s) => s.botEnabled)
@@ -49,7 +52,8 @@ export function useTradingBot(): void {
 
         const indicators = computeAll(candles)
         const activePrice = latest.close
-        const { positions, openPosition, closePosition, setBotStatus, simSizeUsd, simLeverage } = useAppStore.getState()
+        const { positions, openPosition, closePosition, setBotStatus, addBotLogEntry, simSizeUsd, simLeverage } =
+          useAppStore.getState()
         const held = positions.find((p) => p.coin === coin) ?? null
 
         let result
@@ -69,7 +73,9 @@ export function useTradingBot(): void {
         }
         lastErrorToastedRef.current = false
         if (cancelled) return
-        setBotStatus(coin, { ...result, timestamp: Date.now() })
+        const decidedAt = Date.now()
+        setBotStatus(coin, { ...result, timestamp: decidedAt })
+        addBotLogEntry({ ...result, coin, timestamp: decidedAt })
 
         const action = decideBotAction(result.decision, result.confidence, held?.side ?? null)
         if (action.type === 'noop') return

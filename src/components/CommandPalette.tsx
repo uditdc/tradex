@@ -9,7 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from './ui/command'
-import { triggerAsk } from '../hooks/useAiRead'
+import { triggerAsk } from '../hooks/useAsk'
 import { INTERVAL_MS } from '../lib/hl/intervals'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'

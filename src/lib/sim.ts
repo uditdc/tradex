@@ -96,12 +96,13 @@ export function formatSignedPct(n: number): string {
 }
 
 /**
- * Below this confidence, the bot does nothing regardless of `decision` — per TypeSafe's own
- * confidence guidance (docs.typesafe.ai/confidence), gate automatic action on a threshold
- * validated against the domain. This isn't high-stakes (paper positions only), so it sits
- * well under the docs' real-money example (>0.9); 0.6 favors actually trading over sitting idle.
+ * Below this confidence, the bot does nothing regardless of `decision`. Auto Mode is meant
+ * to act on every candle without waiting for a high-confidence setup — Jev's own `hold`
+ * judgment is already the "don't trade" signal — so the default is 0 (no gate: any real
+ * confidence value on a buy/sell qualifies). The parameter stays available for callers who
+ * do want a real threshold (see the confidence-gated tests below).
  */
-export const BOT_CONFIDENCE_THRESHOLD = 0.6
+export const BOT_CONFIDENCE_THRESHOLD = 0
 
 export type BotAction =
   | { type: 'open'; side: 'long' | 'short' }

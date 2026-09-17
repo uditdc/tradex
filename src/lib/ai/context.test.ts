@@ -54,28 +54,4 @@ describe('buildContext', () => {
     const ctx = buildContext('HYPE', '1m', candles, indicators, marketCtx, book)
     expect(ctx.candles).toHaveLength(60)
   })
-
-  it('omits openPositions/priorSuggestion when neither is given', () => {
-    const candles = Array.from({ length: 60 }, (_, i) => candle(i * 60_000))
-    const ctx = buildContext('HYPE', '1m', candles, indicators, marketCtx, book)
-    expect(ctx.openPositions).toBeUndefined()
-    expect(ctx.priorSuggestion).toBeUndefined()
-  })
-
-  it('includes openPositions and priorSuggestion when given', () => {
-    const candles = Array.from({ length: 60 }, (_, i) => candle(i * 60_000))
-    const openPositions = [
-      { side: 'long' as const, entryPrice: 80, sizeUsd: 5000, leverage: 5, unrealizedPnl: 125 },
-    ]
-    const priorSuggestion = {
-      bias: 'long',
-      key_levels: [],
-      invalidation: 'close below 78',
-      rationale: 'prior read',
-      timestamp: 1000,
-    }
-    const ctx = buildContext('HYPE', '1m', candles, indicators, marketCtx, book, 200, openPositions, priorSuggestion)
-    expect(ctx.openPositions).toEqual(openPositions)
-    expect(ctx.priorSuggestion).toEqual(priorSuggestion)
-  })
 })

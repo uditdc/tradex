@@ -151,8 +151,13 @@ describe('decideBotAction', () => {
     expect(decideBotAction('hold', 0.95, 'long')).toEqual({ type: 'noop' })
   })
 
-  it('does nothing when confidence is below the threshold', () => {
-    expect(decideBotAction('buy', 0.59, null)).toEqual({ type: 'noop' })
+  it('acts on any real confidence by default (no gate — Auto Mode does not wait)', () => {
+    expect(decideBotAction('buy', 0.01, null)).toEqual({ type: 'open', side: 'long' })
+    expect(decideBotAction('sell', 0.99, null)).toEqual({ type: 'open', side: 'short' })
+  })
+
+  it('does nothing when confidence is below an explicit threshold', () => {
+    expect(decideBotAction('buy', 0.59, null, 0.6)).toEqual({ type: 'noop' })
     expect(decideBotAction('buy', 0.6, null, 0.6)).toEqual({ type: 'open', side: 'long' })
   })
 

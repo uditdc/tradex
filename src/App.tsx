@@ -2,10 +2,10 @@ import { Toaster } from 'sonner'
 import { AiPanel } from './components/AiPanel'
 import { ChartPanel } from './components/ChartPanel'
 import { CommandPalette } from './components/CommandPalette'
+import { PositionsBar } from './components/PositionsBar'
 import { StatusLine } from './components/StatusLine'
 import { TopBar } from './components/TopBar'
 import { Watchlist } from './components/Watchlist'
-import { useAiRead } from './hooks/useAiRead'
 import { useCandles } from './hooks/useCandles'
 import { usePersistedLedger } from './hooks/usePersistedLedger'
 import { usePersistedPositions } from './hooks/usePersistedPositions'
@@ -18,7 +18,6 @@ function App() {
   const coin = useAppStore((s) => s.coin)
   const interval = useAppStore((s) => s.interval)
   useCandles(coin, interval)
-  useAiRead()
   useWatchlist()
   usePersistedPositions()
   usePersistedLedger()
@@ -29,11 +28,14 @@ function App() {
     <div className="bg-term-bg flex h-screen w-screen flex-col overflow-hidden">
       <TopBar />
       <Watchlist />
-      <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">
-          <ChartPanel />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1">
+            <ChartPanel />
+          </div>
+          <AiPanel />
         </div>
-        <AiPanel />
+        <PositionsBar />
       </div>
       <StatusLine />
       <CommandPalette />

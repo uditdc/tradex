@@ -2,15 +2,8 @@ import type { LogEntry } from './types'
 
 function formatEntry(entry: LogEntry): string {
   const time = new Date(entry.timestamp).toISOString()
-  const header = `[${time}] ${entry.coin}:${entry.interval} (${entry.kind})`
-
-  if (entry.kind === 'ask') {
-    return `${header}\nQ: ${entry.question}\nA: ${entry.text}`
-  }
-  if (entry.parsed) {
-    return `${header}\nbias: ${entry.parsed.bias}  confidence: ${entry.parsed.confidence}\n${entry.parsed.rationale}\ninvalidation: ${entry.parsed.invalidation}`
-  }
-  return `${header}\n(unparsed) ${entry.text}`
+  const header = `[${time}] ${entry.coin}:${entry.interval}`
+  return `${header}\nQ: ${entry.question}\nA: ${entry.text}`
 }
 
 export function formatReadLog(entries: LogEntry[]): string {
@@ -23,7 +16,7 @@ export function downloadReadLog(entries: LogEntry[]): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `hl-term-read-log-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`
+  a.download = `hl-term-ask-log-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`
   document.body.appendChild(a)
   a.click()
   a.remove()

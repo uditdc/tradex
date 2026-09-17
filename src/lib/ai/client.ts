@@ -13,10 +13,6 @@ async function postJson(path: string, body: unknown): Promise<string> {
   return text
 }
 
-export function requestRead(context: AiContext): Promise<string> {
-  return postJson('/api/read', context)
-}
-
 export function requestAsk(context: AiContext, question: string): Promise<string> {
   return postJson('/api/ask', { context, question })
 }

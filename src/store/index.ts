@@ -1,13 +1,13 @@
 import { toast } from 'sonner'
 import { create } from 'zustand'
 import type { BotDecisionResult } from '../lib/ai/bot'
-import type { AskState, LogEntry, ReadState } from '../lib/ai/types'
+import type { AskState, LogEntry } from '../lib/ai/types'
 import type { Candle, MarketCtx } from '../lib/hl/types'
 import type { ConnectionStatus } from '../lib/hl/ws'
 import type { Bias, Regime } from '../lib/indicators/types'
 import { formatSignedUsd, pnlForPosition } from '../lib/sim'
 import { addLedgerEntry } from '../lib/storage/ledger'
-import type { CloseReason } from '../lib/storage/ledger'
+import type { CloseReason, LedgerEntry } from '../lib/storage/ledger'
 import { deletePosition, savePosition } from '../lib/storage/positions'
 import type { SimPosition } from '../lib/storage/positions'
 
@@ -15,6 +15,7 @@ export type WsState = ConnectionStatus | 'idle'
 export type { SimPosition }
 
 const MAX_LOG_ENTRIES = 200
+const MAX_BOT_LOG_ENTRIES = 200
 
 const CLOSE_REASON_LABELS: Record<CloseReason, string> = {
   manual: 'Closed',
@@ -36,6 +37,12 @@ export interface BotStatus extends BotDecisionResult {
   timestamp: number
 }
 
+/** One entry in the running Jev decision log (every call, not just the latest per coin). */
+export interface BotLogEntry extends BotDecisionResult {
+  timestamp: number
+  coin: string
+}
+
 interface AppStore {
   coin: string
   interval: string
@@ -44,13 +51,11 @@ interface AppStore {
   wsStatus: WsState
   lastUpdate: number | null
   latencyMs: number | null
-  /** Bumped whenever a candle buffer closes a bar; drives the "read on bar close" trigger. */
+  /** Bumped whenever a candle buffer closes a bar. */
   lastBarCloseAt: number | null
 
-  /** AI reads, keyed by `${coin}:${interval}` so switching back is instant. */
-  aiReadCache: Record<string, ReadState>
   askState: AskState | null
-  /** Capped ring buffer of every read/ask this session, for the downloadable log. */
+  /** Capped ring buffer of every "/" ask this session, for the downloadable log. */
   readLog: LogEntry[]
 
   /** Background-polled watchlist snapshot, keyed by coin. */
@@ -58,6 +63,8 @@ interface AppStore {
 
   /** Trading bot's latest decision per coin, keyed by coin. */
   botStatus: Record<string, BotStatus>
+  /** Every Jev decision this session, newest first, capped. */
+  botLog: BotLogEntry[]
 
   /** Paper-trading simulator: open hypothetical positions and the size/leverage inputs for the next one. */
   positions: SimPosition[]
@@ -65,6 +72,10 @@ interface AppStore {
   simLeverage: number
   /** Sum of every booked ledger entry's PnL — the realized half of the global paper account's equity. */
   realizedPnl: number
+  /** Sum of realized PnL from closes booked *this session* only — never hydrated from storage, starts at 0 on load. */
+  sessionPnl: number
+  /** Full closed-trade history (durable ledger), newest first. */
+  ledger: LedgerEntry[]
 
   setCoinInterval: (coin: string, interval: string) => void
   setCandles: (candles: Candle[]) => void
@@ -73,11 +84,11 @@ interface AppStore {
   setLastUpdate: (lastUpdate: number) => void
   setLatencyMs: (latencyMs: number) => void
   setLastBarCloseAt: (lastBarCloseAt: number) => void
-  setAiRead: (key: string, state: ReadState) => void
   setAskState: (state: AskState | null) => void
   addLogEntry: (entry: LogEntry) => void
   setWatchlistEntry: (coin: string, entry: WatchlistEntry) => void
   setBotStatus: (coin: string, status: BotStatus) => void
+  addBotLogEntry: (entry: BotLogEntry) => void
 
   openPosition: (input: Omit<SimPosition, 'id' | 'openedAt'>) => void
   /**
@@ -90,8 +101,9 @@ interface AppStore {
   updatePositionSlTp: (id: number, patch: { stopLoss?: number; takeProfit?: number }) => void
   /** Replaces the in-memory position list with what's in durable storage; called once on startup. */
   hydratePositions: (positions: SimPosition[]) => void
-  /** Seeds `realizedPnl` from the durable ledger's total; called once on startup. */
+  /** Seeds `realizedPnl` and `ledger` from durable storage; called once on startup. `sessionPnl` is deliberately not seeded. */
   hydrateRealizedPnl: (total: number) => void
+  hydrateLedger: (entries: LedgerEntry[]) => void
   setSimSizeUsd: (sizeUsd: number) => void
   setSimLeverage: (leverage: number) => void
 }
@@ -105,15 +117,17 @@ export const useAppStore = create<AppStore>((set) => ({
   lastUpdate: null,
   latencyMs: null,
   lastBarCloseAt: null,
-  aiReadCache: {},
   askState: null,
   readLog: [],
   watchlistData: {},
   botStatus: {},
+  botLog: [],
   positions: [],
   simSizeUsd: 5000,
   simLeverage: 5,
   realizedPnl: 0,
+  sessionPnl: 0,
+  ledger: [],
 
   setCoinInterval: (coin, interval) => set({ coin, interval }),
   setCandles: (candles) => set({ candles }),
@@ -122,11 +136,11 @@ export const useAppStore = create<AppStore>((set) => ({
   setLastUpdate: (lastUpdate) => set({ lastUpdate }),
   setLatencyMs: (latencyMs) => set({ latencyMs }),
   setLastBarCloseAt: (lastBarCloseAt) => set({ lastBarCloseAt }),
-  setAiRead: (key, state) => set((s) => ({ aiReadCache: { ...s.aiReadCache, [key]: state } })),
   setAskState: (askState) => set({ askState }),
   addLogEntry: (entry) => set((s) => ({ readLog: [...s.readLog, entry].slice(-MAX_LOG_ENTRIES) })),
   setWatchlistEntry: (coin, entry) => set((s) => ({ watchlistData: { ...s.watchlistData, [coin]: entry } })),
   setBotStatus: (coin, status) => set((s) => ({ botStatus: { ...s.botStatus, [coin]: status } })),
+  addBotLogEntry: (entry) => set((s) => ({ botLog: [entry, ...s.botLog].slice(0, MAX_BOT_LOG_ENTRIES) })),
 
   openPosition: (input) =>
     set((s) => {
@@ -145,7 +159,12 @@ export const useAppStore = create<AppStore>((set) => ({
         return { positions }
       }
       const pnl = pnlForPosition(position, exitPrice)
-      void addLedgerEntry({
+      const closedAt = Date.now()
+      const entry: LedgerEntry = {
+        // Synthetic id for the in-memory mirror — IndexedDB assigns the real
+        // autoincrement id independently; this array is a display copy, not the
+        // source of truth, so a collision-free session-local id is all it needs.
+        id: closedAt,
         coin: position.coin,
         interval: position.interval,
         side: position.side,
@@ -155,15 +174,21 @@ export const useAppStore = create<AppStore>((set) => ({
         exitPrice,
         pnl,
         openedAt: position.openedAt,
-        closedAt: Date.now(),
+        closedAt,
         reason,
-      })
+      }
+      void addLedgerEntry(entry)
       void deletePosition(id)
       const reasonLabel = CLOSE_REASON_LABELS[reason]
       const message = `${reasonLabel}: ${position.side.toUpperCase()} ${position.coin} ${formatSignedUsd(pnl)}`
       if (pnl >= 0) toast.success(message)
       else toast.error(message)
-      return { positions, realizedPnl: s.realizedPnl + pnl }
+      return {
+        positions,
+        realizedPnl: s.realizedPnl + pnl,
+        sessionPnl: s.sessionPnl + pnl,
+        ledger: [entry, ...s.ledger],
+      }
     }),
   updatePositionSlTp: (id, patch) =>
     set((s) => {
@@ -174,6 +199,7 @@ export const useAppStore = create<AppStore>((set) => ({
     }),
   hydratePositions: (positions) => set({ positions }),
   hydrateRealizedPnl: (realizedPnl) => set({ realizedPnl }),
+  hydrateLedger: (entries) => set({ ledger: entries }),
   setSimSizeUsd: (simSizeUsd) => set({ simSizeUsd }),
   setSimLeverage: (simLeverage) => set({ simLeverage }),
 }))

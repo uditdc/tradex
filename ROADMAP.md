@@ -812,8 +812,86 @@ Notes:
 
 ---
 
+## Phase 14 — Drop the narrative AI Read; Auto Mode becomes the primary loop
+- [x] Removed `/api/read`, the narrative `AiRead`/`ReadState`/`KeyLevel`/`Zone`/
+      `PositionGuidance` types, `lib/ai/parse.ts`, `lib/storage/reads.ts` (Phase 8's
+      read-history store), the chart's key_levels/zones drawing, and the AI Read
+      panel section — deleted, not just hidden, per the request ("if the AI read is
+      just to summarize and give a text summary of the trade, remove it")
+- [x] `decideBotAction`'s confidence gate defaults to 0 — Auto Mode now acts on
+      every real Jev decision on every 1m close without waiting for a
+      high-confidence setup; `hold` is itself the only "don't trade" signal
+- [x] New: a live countdown to the next Jev analysis (seconds to the next wall-clock
+      minute boundary, since that's when `useTradingBot` polls)
+- [x] New: a Jev call log — every decision this session (not just the latest per
+      coin), timestamped, in the AI panel
+- [x] New: trade history — the full realized-PnL ledger (already durable since
+      Phase 10) rendered in the UI for the first time; previously write-only
+- [x] New: session PnL — a counter separate from the all-time `realizedPnl`, starts
+      at 0 on load and never hydrates from storage, shown in the status line
+      alongside the existing all-time Equity/Returns
+- [x] Moved Positions and Trade History out of `AiPanel` entirely into a new
+      `PositionsBar`, a full-width bar below the chart+AI row (not squeezed into the
+      narrow AI panel column) — a follow-up layout request mid-implementation
+
+**Done when:** the AI panel has no narrative read section left, Auto Mode opens/flips
+positions on the very next 1m close a real buy/sell decision comes back (no confidence
+wait), and trade history / session PnL are visible, not just stored, in their own
+wide panel separate from AiPanel.
+
+Notes:
+
+- Triggered by a live user complaint ("Model did not return strict JSON — showing
+  raw text") that turned out to be the free-tier OpenRouter model failing with real
+  502/504s (confirmed via direct `curl` against `/api/read`, three failures in a
+  row) — before that could be fixed, a mid-conversation follow-up reframed the ask
+  entirely: drop the narrative feature rather than harden it, since it was never
+  the point once the bot existed.
+- **What "remove" meant in practice:** not just unmounting the UI section — deleted
+  the server route, the client, the parser, the storage layer, and every type that
+  existed only to serve it. `/api/ask` (manual "/" mode) and its own `AiContext`/
+  `buildContext`/`LogEntry` were kept and simplified (dropped the `openPositions`/
+  `priorSuggestion`/`kind` fields that only Phase 12's read-context threading ever
+  used) rather than removed, since ask mode is a separate, still-wanted, manual
+  feature nothing in this request touched. `lib/storage/db.ts` stopped creating the
+  `reads` object store for new installs; did not write migration code to delete it
+  from browsers that already have one — harmless leftover local data, not worth a
+  destructive migration for.
+- **Confidence gate:** previously 0.6 (see Phase 13's notes on TypeSafe's own
+  three-tier confidence guidance). Changed to 0 per explicit instruction ("it
+  shouldn't wait for me to open a paper trade... it should go for it"). The
+  parameterized threshold itself wasn't removed from `decideBotAction` — only its
+  default — so a future "only act above X% confidence" toggle is still a one-line
+  change away if wanted later, not a redesign.
+- **Trade history's in-memory `id`:** the ledger's real id is IndexedDB's
+  autoincrement key, assigned asynchronously on write; the in-memory `ledger` array
+  (for instant UI rendering without an IndexedDB round-trip) uses `closedAt` as a
+  synthetic id instead of waiting for the real one — a session-local display copy,
+  never written back to storage with that id, so the mismatch is harmless.
+- Session PnL and all-time realized PnL now diverge on purpose: `realizedPnl`
+  hydrates from the full historical ledger on load (Phase 11); `sessionPnl` starts
+  at 0 every load and only accumulates from closes booked *this* session — answers
+  "how did today go" separately from "how has this account done ever."
+- Cleaned the parking lot below: three of its four items (AI-level alerts,
+  multi-timeframe reads, session replay of reads) referenced the now-deleted
+  narrative read and no longer make sense.
+- `pnpm typecheck`/`pnpm test`/`pnpm lint` all green after the removal
+  (95 tests, down from 116 — the read/parse-specific tests were deleted along with
+  the code, not just left stale).
+- **Layout follow-up** (`PositionsBar.tsx`, new): the App.tsx row structure changed
+  from `[chart | AiPanel]` to `[chart | AiPanel]` stacked above a new full-width
+  `PositionsBar`, inside a shared `flex-col` wrapper so the fixed-viewport/no-scroll
+  rule still holds (`PositionsBar` has a fixed `h-52`, each of its two columns
+  scrolls internally). All the position-management logic (open-position cards,
+  SL/TP inline edit, manual close with the live-price fallback fetch, the
+  re-check-verdict button) moved verbatim out of `AiPanel.tsx` into the new file —
+  same behavior, just relocated; `AiPanel` now only holds Auto Mode/call log, Ask,
+  and the Trade Suggestion card. Verified live: opened a real paper position and
+  confirmed it renders in the new wide bottom bar, not the AI panel.
+
+---
+
 ## Parking lot (ideas, not commitments)
-- Alerts: price crosses an AI level, funding flip, RSI extreme → Sonner toast + sound
-- Fast model for auto-reads, stronger model for `/` questions
-- Multi-timeframe read (15m + 4h side by side)
-- Session replay: step through the last day's reads against the chart
+- Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
+- Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)
+- Multi-coin Auto Mode (currently trades only whichever coin is active)
