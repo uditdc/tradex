@@ -22,7 +22,8 @@ read" anymore; that feature was removed in favor of the bot.
 Indicators (bias, RSI, ATR%, volume ratio, swing support/resistance, regime — see
 "Indicator block (v1 scope)") are still computed deterministically every tick; there is
 no dedicated visual panel for them (dropped in Phase 6 to match the imported design),
-but they still drive the chart's price lines and the AI trade suggestion's target/stop.
+but they still drive the bot-decision context and the auto-opened positions'
+stop-loss/take-profit (nearest swing support/resistance).
 
 ## Non-goals (do not build these)
 
@@ -93,7 +94,8 @@ Bias (EMA 9/21/55 stack), RSI 14, ATR 14 as % of price, volume vs 20-bar average
 nearest swing support/resistance with % distance, funding rate, OI + OI change over
 lookback, one-word regime tag (trending / ranging / compressing). Computed by
 `lib/indicators` on every tick; consumed by the bot-decision context and the
-chart/trade suggestion, not rendered as its own panel (see "What this is").
+auto-trading bot's own stop-loss/take-profit calculation, not rendered as its own
+panel (see "What this is").
 
 ## Bot-decision contract (`/api/bot-decision`)
 
@@ -118,8 +120,8 @@ Reference is a Bloomberg terminal, not a Matrix screensaver. Dense, calm, amber-
 - Palette: `#0B0D10` background, `#14181D` panel, `#2A313A` hairline borders,
   `#E8B45A` amber for live data and emphasis, `#9AA4B2` muted labels,
   `#4ADE80` / `#F87171` strictly for long/short–up/down semantics, never decoration,
-  `#A78BFA` violet reserved for AI-generated accents (trade suggestion, position
-  verdicts) so they read as distinct from live market data.
+  `#A78BFA` violet reserved for AI-generated accents (position verdicts) so they
+  read as distinct from live market data.
 - Type: JetBrains Mono everywhere. Data at `text-sm` with `tabular-nums`; labels
   uppercase `text-[11px] tracking-widest` muted. No display font, no hero anything.
 - Layout: fixed viewport grid, no page scroll. Top bar / watchlist / (center chart +

@@ -57,11 +57,6 @@ export function computePositionVerdict(
   return { verdict: 'KEEP', note: 'Structure intact — bias unchanged.' }
 }
 
-/** long unless the given bias string clearly says short (mirrors AI/indicator bias vocab: "long"/"short"/"neutral"). */
-export function suggestionSideFromBias(bias: string | undefined): 'long' | 'short' {
-  return (bias ?? '').toLowerCase().includes('short') ? 'short' : 'long'
-}
-
 export type SlTpReason = 'stop_loss' | 'take_profit'
 
 /**

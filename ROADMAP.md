@@ -885,9 +885,40 @@ Notes:
   scrolls internally). All the position-management logic (open-position cards,
   SL/TP inline edit, manual close with the live-price fallback fetch, the
   re-check-verdict button) moved verbatim out of `AiPanel.tsx` into the new file —
-  same behavior, just relocated; `AiPanel` now only holds Auto Mode/call log, Ask,
-  and the Trade Suggestion card. Verified live: opened a real paper position and
+  same behavior, just relocated. Verified live: opened a real paper position and
   confirmed it renders in the new wide bottom bar, not the AI panel.
+- **Second follow-up: removed the manual Trade Suggestion card entirely** ("remove
+  trade suggestions, since it's automated I don't need a trade suggestion to open
+  manually — any suggestion should automatically be executed by the bot"). Deleted
+  the LONG/SHORT header, Entry/TP/SL preview fields, `OPEN (PAPER)` button, and the
+  `suggestionSide`/`suggestionTarget`/`suggestionStop`/draft-input state that only
+  fed it — the bot's own `useTradingBot` loop already computes its own SL/TP from
+  swing levels and opens positions itself, so this manual path was pure redundancy
+  once Auto Mode has no confidence gate. `suggestionSideFromBias` (`lib/sim.ts`)
+  became unused by this removal and was deleted along with its test, per this
+  project's no-dead-code convention. The Size/Lev sliders were *kept* (moved into
+  the Auto Mode section) since they're real config — `useTradingBot` reads
+  `simSizeUsd`/`simLeverage` from the same store fields to size every auto-trade;
+  removing them would have removed the only way to control the bot's position size.
+- **Positions section is now a table, not cards** (`PositionsBar.tsx`): columns
+  Coin/Side/Size/Lev/Entry/TP/SL/PnL/Verdict/Close, one row per open position, same
+  inline-editable TP/SL inputs and manual-close-with-fallback-price logic as
+  before, just laid out as `<table>`/`<tr>`/`<td>` instead of a `flex-wrap` of
+  bordered card divs — a plain hand-styled table (this app's established pattern
+  for tabular UI, e.g. `StatusLine`/`ChartPanel`) rather than adding shadcn's Table
+  primitive, since nothing else in the app routes through shadcn for dense
+  data display and it would need the same amount of restyling either way.
+- **Verified live, real data, not just a screenshot of an empty state:** since the
+  manual open button is gone, the only way to get a position into the table now is
+  via a real bot auto-trade — waited several minutes for one (Jev returned `hold`
+  repeatedly in that window) and, to get a deterministic check of the table's
+  actual rendering rather than keep waiting on live model randomness, seeded one
+  realistic position directly into the `positions` IndexedDB store (same shape
+  `openPosition` itself writes) and reloaded: the table rendered all ten columns
+  correctly, editable TP/SL inputs worked, and clicking Close correctly removed the
+  row, booked a real ledger entry (`TRADE HISTORY (0)` → `(1)`), and showed the
+  same signed-PnL toast (`Closed: LONG HYPE +$65.41`) as before the table rewrite —
+  confirming the structural change didn't regress the underlying close mechanics.
 
 ---
 

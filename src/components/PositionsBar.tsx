@@ -101,78 +101,92 @@ export function PositionsBar() {
 
         {positions.length === 0 && <p className="text-term-muted text-sm">No simulated positions yet.</p>}
 
-        <div className="flex flex-wrap gap-2">
-          {positionRows.map(({ position, pnl, cur, verdict }) => (
-            <div key={position.id} className="border-term-border flex w-64 flex-col gap-1.5 rounded-sm border p-2">
-              <div className="flex items-baseline justify-between">
-                <span className="flex items-center gap-1.5">
-                  <span className={`text-xs font-semibold ${position.side === 'long' ? 'text-term-up' : 'text-term-down'}`}>
-                    {position.coin} {position.side.toUpperCase()}
-                  </span>
-                  <span className="border-term-violet text-term-violet rounded-sm border px-1 text-[9px]">SIM</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void handleClose(position, cur)}
-                  disabled={closingIds.has(position.id)}
-                  className="border-term-border text-term-muted hover:border-term-amber hover:text-term-amber rounded-sm border px-1.5 py-0.5 text-[10px] tracking-wide uppercase disabled:opacity-40"
-                >
-                  {closingIds.has(position.id) ? '...' : 'Close'}
-                </button>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-term-muted text-xs">
-                  ${position.sizeUsd.toLocaleString()} · {position.leverage}x · entry {position.entryPrice.toFixed(2)}
-                </span>
-                <span
-                  className={`text-sm font-semibold ${pnl === null ? 'text-term-muted' : pnl >= 0 ? 'text-term-up' : 'text-term-down'}`}
-                >
-                  {pnl === null ? '—' : formatSignedUsd(pnl)}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-[10px]">
-                <span className="text-term-up flex items-center gap-1">
-                  TP
-                  <input
-                    type="number"
-                    defaultValue={position.takeProfit ?? ''}
-                    onBlur={(e) =>
-                      updatePositionSlTp(position.id, {
-                        stopLoss: position.stopLoss,
-                        takeProfit: e.target.value === '' ? undefined : Number(e.target.value),
-                      })
-                    }
-                    className="border-term-border w-14 rounded-sm border bg-transparent px-1 py-0.5 text-right"
-                  />
-                </span>
-                <span className="text-term-down flex items-center gap-1">
-                  SL
-                  <input
-                    type="number"
-                    defaultValue={position.stopLoss ?? ''}
-                    onBlur={(e) =>
-                      updatePositionSlTp(position.id, {
-                        stopLoss: e.target.value === '' ? undefined : Number(e.target.value),
-                        takeProfit: position.takeProfit,
-                      })
-                    }
-                    className="border-term-border w-14 rounded-sm border bg-transparent px-1 py-0.5 text-right"
-                  />
-                </span>
-              </div>
-              {verdict && (
-                <div className="border-term-border/60 flex items-baseline gap-1.5 border-t pt-1.5">
-                  <span
-                    className={`text-[10px] font-semibold ${verdict.verdict === 'CLOSE' ? 'text-term-down' : verdict.verdict === 'KEEP' ? 'text-term-up' : 'text-term-muted'}`}
+        {positions.length > 0 && (
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="text-term-muted border-term-border border-b text-[10px] tracking-widest uppercase">
+                <th className="px-1.5 py-1 text-left font-normal">Coin</th>
+                <th className="px-1.5 py-1 text-left font-normal">Side</th>
+                <th className="px-1.5 py-1 text-right font-normal">Size</th>
+                <th className="px-1.5 py-1 text-right font-normal">Lev</th>
+                <th className="px-1.5 py-1 text-right font-normal">Entry</th>
+                <th className="px-1.5 py-1 text-right font-normal">TP</th>
+                <th className="px-1.5 py-1 text-right font-normal">SL</th>
+                <th className="px-1.5 py-1 text-right font-normal">PnL</th>
+                <th className="px-1.5 py-1 text-left font-normal">Verdict</th>
+                <th className="px-1.5 py-1" />
+              </tr>
+            </thead>
+            <tbody>
+              {positionRows.map(({ position, pnl, cur, verdict }) => (
+                <tr key={position.id} className="border-term-border/60 border-b tabular-nums">
+                  <td className="px-1.5 py-1.5 font-semibold">{position.coin}</td>
+                  <td
+                    className={`px-1.5 py-1.5 font-semibold ${position.side === 'long' ? 'text-term-up' : 'text-term-down'}`}
                   >
-                    {verdict.verdict}
-                  </span>
-                  <span className="text-term-muted text-xs">{verdict.note}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                    {position.side.toUpperCase()}
+                  </td>
+                  <td className="text-term-muted px-1.5 py-1.5 text-right">${position.sizeUsd.toLocaleString()}</td>
+                  <td className="text-term-muted px-1.5 py-1.5 text-right">{position.leverage}x</td>
+                  <td className="text-term-muted px-1.5 py-1.5 text-right">{position.entryPrice.toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right">
+                    <input
+                      type="number"
+                      defaultValue={position.takeProfit ?? ''}
+                      onBlur={(e) =>
+                        updatePositionSlTp(position.id, {
+                          stopLoss: position.stopLoss,
+                          takeProfit: e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                      className="text-term-up border-term-border w-16 rounded-sm border bg-transparent px-1 py-0.5 text-right"
+                    />
+                  </td>
+                  <td className="px-1.5 py-1.5 text-right">
+                    <input
+                      type="number"
+                      defaultValue={position.stopLoss ?? ''}
+                      onBlur={(e) =>
+                        updatePositionSlTp(position.id, {
+                          stopLoss: e.target.value === '' ? undefined : Number(e.target.value),
+                          takeProfit: position.takeProfit,
+                        })
+                      }
+                      className="text-term-down border-term-border w-16 rounded-sm border bg-transparent px-1 py-0.5 text-right"
+                    />
+                  </td>
+                  <td
+                    className={`px-1.5 py-1.5 text-right font-semibold ${pnl === null ? 'text-term-muted' : pnl >= 0 ? 'text-term-up' : 'text-term-down'}`}
+                  >
+                    {pnl === null ? '—' : formatSignedUsd(pnl)}
+                  </td>
+                  <td className="px-1.5 py-1.5">
+                    {verdict ? (
+                      <span
+                        className={`font-semibold ${verdict.verdict === 'CLOSE' ? 'text-term-down' : verdict.verdict === 'KEEP' ? 'text-term-up' : 'text-term-muted'}`}
+                        title={verdict.note}
+                      >
+                        {verdict.verdict}
+                      </span>
+                    ) : (
+                      <span className="text-term-muted">—</span>
+                    )}
+                  </td>
+                  <td className="px-1.5 py-1.5 text-right">
+                    <button
+                      type="button"
+                      onClick={() => void handleClose(position, cur)}
+                      disabled={closingIds.has(position.id)}
+                      className="border-term-border text-term-muted hover:border-term-amber hover:text-term-amber rounded-sm border px-1.5 py-0.5 text-[10px] tracking-wide uppercase disabled:opacity-40"
+                    >
+                      {closingIds.has(position.id) ? '...' : 'Close'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-y-auto p-3">

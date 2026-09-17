@@ -8,7 +8,6 @@ import {
   formatSignedUsd,
   livePriceForPosition,
   pnlForPosition,
-  suggestionSideFromBias,
 } from './sim'
 
 describe('livePriceForPosition', () => {
@@ -52,15 +51,6 @@ describe('computePositionVerdict', () => {
 
   it('closes a short once resistance reclaims', () => {
     expect(computePositionVerdict('short', 115, 90, 110).verdict).toBe('CLOSE')
-  })
-})
-
-describe('suggestionSideFromBias', () => {
-  it('reads short only when the bias clearly says so', () => {
-    expect(suggestionSideFromBias('short')).toBe('short')
-    expect(suggestionSideFromBias('long')).toBe('long')
-    expect(suggestionSideFromBias('neutral')).toBe('long')
-    expect(suggestionSideFromBias(undefined)).toBe('long')
   })
 })
 
