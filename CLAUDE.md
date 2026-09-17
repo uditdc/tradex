@@ -107,8 +107,11 @@ panel (see "What this is").
 
 ## Strategies
 
-Auto Mode runs one **strategy** at a time, picked in `AiPanel` (persisted as
-`activeStrategy` in `useConfigStore`) and applied on the next poll — switching
+Auto Mode runs one **strategy** at a time, picked from `AiPanel`'s Session Settings
+dialog (gear icon in the header; persisted as `activeStrategy` in `useConfigStore`
+alongside size/leverage — every option that isn't the live decision itself lives in
+that one dialog, not scattered across the always-visible panel) and applied on the
+next poll — switching
 strategy while Auto Mode is on restarts `useTradingBot`'s poll loop for the new
 strategy immediately, the same way switching coin already does. A strategy decides
 two things: what extra data `useTradingBot` pulls from Hyperliquid beyond the base

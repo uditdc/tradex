@@ -1187,6 +1187,24 @@ Notes:
   for `startSession`/`endSession` and `sessionStartedAt` in
   `config.test.ts`, one existing `toggleBot` test updated).
 
+## Phase 21 — Session Settings dialog
+- [x] Moved the Strategy picker and Size/Lev sliders out of `AiPanel`'s
+  always-visible body into a "Session Settings" dialog, opened by a gear
+  icon (`lucide-react`'s `SettingsIcon`) added next to the Start/End Session
+  button. The main panel now only shows the header, the countdown ring, and
+  the live decision (Scenario/Action/Why) while a session is active —
+  nothing else competes for space.
+- [x] Every option that isn't part of the live decision itself now lives in
+  one place (the dialog) instead of three separate always-visible rows;
+  changes still apply immediately (no separate "save" step) and switching
+  strategy mid-session still restarts the poll loop, unchanged from Phase 19.
+- Reused the same shadcn dialog primitive as the end-session confirm dialog
+  from Phase 20 — no new UI dependency.
+- Not visually verified in a browser — no browser-automation tool available
+  this session (same limitation as Phases 17 and 20).
+- `pnpm typecheck`/`test` (100 passed, unchanged — this phase only moved
+  existing JSX, no new logic)/`lint`/`build` all green.
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

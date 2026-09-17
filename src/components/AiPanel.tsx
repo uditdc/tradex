@@ -1,3 +1,4 @@
+import { SettingsIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { BotDecision, BotScenario, FactorScore } from '../lib/ai/bot'
 import { resolveClosePrice } from '../lib/closePosition'
@@ -132,6 +133,7 @@ export function AiPanel() {
 
   const [endDialogOpen, setEndDialogOpen] = useState(false)
   const [ending, setEnding] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   async function handleConfirmEnd() {
     setEnding(true)
@@ -183,6 +185,14 @@ export function AiPanel() {
         </div>
         <button
           type="button"
+          onClick={() => setSettingsOpen(true)}
+          title="Session settings"
+          className="border-term-border text-term-muted hover:border-term-amber hover:text-term-amber shrink-0 rounded-sm border p-1"
+        >
+          <SettingsIcon className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
           onClick={botEnabled ? () => setEndDialogOpen(true) : startSession}
           className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
             botEnabled ? 'border-term-amber text-term-amber' : 'border-term-border text-term-muted hover:border-term-amber hover:text-term-amber'
@@ -191,6 +201,77 @@ export function AiPanel() {
           {botEnabled ? 'End Session' : 'Start Session'}
         </button>
       </div>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Session Settings</DialogTitle>
+            <DialogDescription>
+              Changes apply immediately — switching strategy while a session is active restarts the poll loop.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-term-muted w-8 shrink-0 text-[10px]">Strategy</span>
+            <div className="flex gap-1">
+              {STRATEGIES.map((strategy) => (
+                <button
+                  key={strategy.id}
+                  type="button"
+                  onClick={() => setActiveStrategy(strategy.id)}
+                  title={strategy.description}
+                  className={`flex-1 rounded-sm border px-1.5 py-1 text-[10px] tracking-wide uppercase ${
+                    activeStrategy === strategy.id
+                      ? 'border-term-amber text-term-amber'
+                      : 'border-term-border text-term-muted'
+                  }`}
+                >
+                  {strategy.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-term-muted w-8 shrink-0 text-[10px]">Size</span>
+              <input
+                type="range"
+                min={500}
+                max={20000}
+                step={500}
+                value={simSizeUsd}
+                onChange={(e) => setSimSizeUsd(Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-term-amber w-16 shrink-0 text-right text-xs">${simSizeUsd.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-term-muted w-8 shrink-0 text-[10px]">Lev</span>
+              <input
+                type="range"
+                min={1}
+                max={25}
+                step={1}
+                value={simLeverage}
+                onChange={(e) => setSimLeverage(Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-term-amber w-16 shrink-0 text-right text-xs">{simLeverage}x</span>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(false)}
+              className="border-term-amber text-term-amber rounded-sm border px-3 py-1.5 text-xs font-semibold tracking-wide uppercase"
+            >
+              Done
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>
         <DialogContent showCloseButton={false}>
@@ -222,58 +303,6 @@ export function AiPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <div className="border-term-border flex flex-col gap-2 border-b p-3">
-        <div className="flex items-center gap-2">
-          <span className="text-term-muted w-8 shrink-0 text-[10px]">Strategy</span>
-          <div className="flex flex-1 gap-1">
-            {STRATEGIES.map((strategy) => (
-              <button
-                key={strategy.id}
-                type="button"
-                onClick={() => setActiveStrategy(strategy.id)}
-                title={strategy.description}
-                className={`flex-1 rounded-sm border px-1.5 py-1 text-[10px] tracking-wide uppercase ${
-                  activeStrategy === strategy.id
-                    ? 'border-term-amber text-term-amber'
-                    : 'border-term-border text-term-muted'
-                }`}
-              >
-                {strategy.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="border-term-border flex flex-col gap-2 border-b p-3">
-        <div className="flex items-center gap-2">
-          <span className="text-term-muted w-8 shrink-0 text-[10px]">Size</span>
-          <input
-            type="range"
-            min={500}
-            max={20000}
-            step={500}
-            value={simSizeUsd}
-            onChange={(e) => setSimSizeUsd(Number(e.target.value))}
-            className="flex-1"
-          />
-          <span className="text-term-amber w-16 shrink-0 text-right text-xs">${simSizeUsd.toLocaleString()}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-term-muted w-8 shrink-0 text-[10px]">Lev</span>
-          <input
-            type="range"
-            min={1}
-            max={25}
-            step={1}
-            value={simLeverage}
-            onChange={(e) => setSimLeverage(Number(e.target.value))}
-            className="flex-1"
-          />
-          <span className="text-term-amber w-16 shrink-0 text-right text-xs">{simLeverage}x</span>
-        </div>
-      </div>
 
       {botEnabled && (
         <>
