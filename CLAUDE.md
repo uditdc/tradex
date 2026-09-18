@@ -197,8 +197,13 @@ one `systemOne` call, then shape the generic response below from `factorMeta`. O
   is operational, not explanatory: `computeStopLossTakeProfit` (`lib/sim.ts`),
   called from `useTradingBot`, turns it into an ATR-scaled buffer added beyond
   the nearest swing level for both the stop and the target — 0 hugs the raw
-  swing level, 2 pushes both a full ATR further away. Entry price is never a
-  Jev decision — it's just the live price at the moment the bot opens; asking a
+  swing level, 2 pushes both a full ATR further away. When a side has no swing
+  level to anchor to yet (`nearestSwingLevels` returned `null`), it falls back to
+  a pure ATR-multiple distance from price (1x at tight .. 3x at wide) instead of
+  leaving that level unset — every position always gets both a stop-loss and a
+  take-profit (`SlTpLevels`'s fields are non-optional for exactly this reason).
+  Entry price is never a Jev decision — it's just the live price at the moment
+  the bot opens; asking a
   model to output a precise price number is a poor fit for these primitives
   (they're typed judgments over described criteria, not numeric regression), so
   price math stays in code and Jev only steers the risk-width input to it.

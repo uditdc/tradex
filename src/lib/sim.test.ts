@@ -40,18 +40,41 @@ describe('pnlForPosition', () => {
 
 describe('computePositionVerdict', () => {
   it('keeps a long while price sits between support and resistance', () => {
-    expect(computePositionVerdict('long', 100, 90, 110)).toEqual({
+    expect(computePositionVerdict({ side: 'long' }, 100, 90, 110)).toEqual({
       verdict: 'KEEP',
       note: 'Structure intact — bias unchanged.',
     })
   })
 
   it('closes a long once support breaks', () => {
-    expect(computePositionVerdict('long', 85, 90, 110).verdict).toBe('CLOSE')
+    expect(computePositionVerdict({ side: 'long' }, 85, 90, 110).verdict).toBe('CLOSE')
   })
 
   it('closes a short once resistance reclaims', () => {
-    expect(computePositionVerdict('short', 115, 90, 110).verdict).toBe('CLOSE')
+    expect(computePositionVerdict({ side: 'short' }, 115, 90, 110).verdict).toBe('CLOSE')
+  })
+
+  it('falls back to the position\'s own stop-loss/take-profit when no structure is available', () => {
+    const position = { side: 'long' as const, stopLoss: 90, takeProfit: 110 }
+    expect(computePositionVerdict(position, 100, null, null)).toEqual({
+      verdict: 'KEEP',
+      note: 'Within stop-loss/take-profit range.',
+    })
+    expect(computePositionVerdict(position, 90, null, null)).toEqual({
+      verdict: 'CLOSE',
+      note: 'Stop-loss hit — close position.',
+    })
+    expect(computePositionVerdict(position, 110, null, null)).toEqual({
+      verdict: 'CLOSE',
+      note: 'Take-profit reached — close position.',
+    })
+  })
+
+  it('keeps a position with neither structure nor its own stop-loss/take-profit, rather than leaving it blank', () => {
+    expect(computePositionVerdict({ side: 'long' }, 100, null, null)).toEqual({
+      verdict: 'KEEP',
+      note: 'No stop-loss/take-profit set for this position.',
+    })
   })
 })
 
@@ -153,9 +176,19 @@ describe('computeStopLossTakeProfit', () => {
     expect(computeStopLossTakeProfit('long', 100, 2, 5, 95, 105)).toEqual({ stopLoss: 93, takeProfit: 107 })
   })
 
-  it('leaves a level undefined when its swing level does not exist yet', () => {
-    expect(computeStopLossTakeProfit('long', 100, 2, 1, null, 105)).toEqual({ stopLoss: undefined, takeProfit: 106 })
-    expect(computeStopLossTakeProfit('long', 100, 2, 1, 95, null)).toEqual({ stopLoss: 94, takeProfit: undefined })
+  it('falls back to an ATR-multiple distance when its swing level does not exist yet', () => {
+    // atrAbs = 2; widthFrac = 0.5 → fallbackDistance = atrAbs * (1 + 0.5*2) = 4
+    expect(computeStopLossTakeProfit('long', 100, 2, 1, null, 105)).toEqual({ stopLoss: 96, takeProfit: 106 })
+    expect(computeStopLossTakeProfit('long', 100, 2, 1, 95, null)).toEqual({ stopLoss: 94, takeProfit: 104 })
+  })
+
+  it('never leaves a level unset, even with no swing levels at all', () => {
+    const { stopLoss, takeProfit } = computeStopLossTakeProfit('short', 100, 2, 2, null, null)
+    expect(stopLoss).not.toBeUndefined()
+    expect(takeProfit).not.toBeUndefined()
+    // riskWidth 2 (wide) → fallbackDistance = atrAbs * 3 = 6; stop above, target below for a short.
+    expect(stopLoss).toBeCloseTo(106)
+    expect(takeProfit).toBeCloseTo(94)
   })
 })
 

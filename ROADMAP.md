@@ -1366,6 +1366,38 @@ Notes:
   tests added — this phase is plumbing two already-available numbers through,
   not new pure logic).
 
+## Phase 28 — Guaranteed stop-loss/take-profit, always-on position verdict
+- [x] `computeStopLossTakeProfit` (`lib/sim.ts`) no longer leaves a level `undefined`
+  when its swing support/resistance doesn't exist yet — it falls back to a pure
+  ATR-multiple distance from price (1x ATR at riskWidth 0/tight, up to 3x at
+  riskWidth 2/wide, same `widthFrac` already driving the swing-anchored buffer).
+  `SlTpLevels`'s fields are now non-optional (`stopLoss: number`, `takeProfit:
+  number`) to make the guarantee visible in the type. Every bot-opened position
+  now always has both levels; `usePositionMonitor` (unchanged) still auto-closes
+  on a crossing regardless of which branch set them.
+- [x] `computePositionVerdict` (`lib/sim.ts`) no longer requires a manual
+  "Re-check" click or being on the position's own coin/interval to produce an
+  answer. It still prefers the live swing-structure read (`structureVerdict`,
+  the original qualitative "does the thesis still hold" check) when that coin's
+  indicators are loaded; for any other position it now falls back to comparing
+  live price against that position's own stop-loss/take-profit (via `checkSlTp`)
+  so there's always a KEEP/CLOSE answer instead of `'—'`. `ActivityBar`'s
+  Positions tab computes this inline on every render now (like `pnl` already
+  was) instead of in a button-triggered `useState` snapshot — the "↻ Re-check"
+  button is gone.
+- Note: since `usePositionMonitor` already auto-closes the instant a position's
+  own stop-loss/take-profit is crossed, the SL/TP-fallback branch of the verdict
+  will read CLOSE only in the brief window before that effect runs — in
+  practice it should almost always show KEEP for positions off the active pair.
+  That's expected; the fallback's job is "never blank," not "predict the close."
+- Not visually verified in a browser or live-verified against the real TypeSafe
+  API — same limitation as recent phases.
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 114 passed (3 new:
+  fallback SL/TP distance, fallback verdict from a position's own levels, and
+  the "neither structure nor levels" KEEP case; existing
+  `computePositionVerdict`/`computeStopLossTakeProfit` tests updated for the
+  new signature/fallback behavior).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

@@ -63,31 +63,24 @@ function PositionsTab() {
   const updatePositionSlTp = useAppStore((s) => s.updatePositionSlTp)
   const dict = useIndicators()
 
-  const [verdicts, setVerdicts] = useState<Record<number, Verdict | { verdict: string; note: string }>>({})
   const [closingIds, setClosingIds] = useState<Set<number>>(new Set())
 
   const activePrice = candles.length > 0 ? candles[candles.length - 1].close : null
 
-  function handleRecheck() {
-    const next: typeof verdicts = {}
-    for (const p of positions) {
-      if (p.coin === coin && p.interval === interval && dict) {
-        const cur = livePriceForPosition(p, coin, activePrice, watchlistData)
-        next[p.id] =
-          cur !== null
-            ? computePositionVerdict(p.side, cur, dict.swingSupport?.price ?? null, dict.swingResistance?.price ?? null)
-            : { verdict: '—', note: 'No live price yet.' }
-      } else {
-        next[p.id] = { verdict: '—', note: `Switch to ${p.coin} ${p.interval} to re-evaluate.` }
-      }
-    }
-    setVerdicts(next)
-  }
-
+  // Structure (swing support/resistance) is only loaded for the currently active chart
+  // pair — this app's single-subscription data model. For any other position,
+  // `computePositionVerdict` itself falls back to that position's own Jev-suggested
+  // stop-loss/take-profit, so every row always gets a KEEP/CLOSE verdict, live, with no
+  // manual re-check step.
   const positionRows = positions.map((p) => {
     const cur = livePriceForPosition(p, coin, activePrice, watchlistData)
     const pnl = cur !== null ? pnlForPosition(p, cur) : null
-    return { position: p, pnl, cur, verdict: verdicts[p.id] }
+    const onActivePair = p.coin === coin && p.interval === interval
+    const support = onActivePair ? (dict?.swingSupport?.price ?? null) : null
+    const resistance = onActivePair ? (dict?.swingResistance?.price ?? null) : null
+    const verdict: Verdict | { verdict: string; note: string } =
+      cur !== null ? computePositionVerdict(p, cur, support, resistance) : { verdict: '—', note: 'No live price yet.' }
+    return { position: p, pnl, cur, verdict }
   })
   const totalPnl = positionRows.reduce((sum, r) => sum + (r.pnl ?? 0), 0)
 
@@ -113,14 +106,6 @@ function PositionsTab() {
             {formatSignedUsd(totalPnl)}
           </span>
         )}
-        <button
-          type="button"
-          onClick={handleRecheck}
-          disabled={positions.length === 0}
-          className="border-term-violet text-term-violet rounded-sm border px-2 py-1 text-[10px] disabled:opacity-40"
-        >
-          ↻ Re-check
-        </button>
       </div>
 
       {positions.length === 0 && <p className="text-term-muted text-sm">No simulated positions yet.</p>}

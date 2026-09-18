@@ -34,14 +34,7 @@ export function pnlForPosition(position: SimPositionLike, currentPrice: number):
   return position.sizeUsd * position.leverage * ((currentPrice - position.entryPrice) / position.entryPrice) * direction
 }
 
-/**
- * Whether a position's original thesis still holds, from the live swing
- * support/resistance of the coin/interval it was opened on. Callers should only
- * call this when that coin/interval's indicators are actually loaded (i.e. it's
- * the currently active pair) — support/resistance for any other coin isn't
- * available in this app's single-subscription data model.
- */
-export function computePositionVerdict(
+function structureVerdict(
   side: 'long' | 'short',
   currentPrice: number,
   support: number | null,
@@ -55,6 +48,35 @@ export function computePositionVerdict(
   if (resistance != null && currentPrice >= resistance) return { verdict: 'CLOSE', note: 'Resistance reclaimed — thesis invalidated.' }
   if (support != null && currentPrice <= support) return { verdict: 'CLOSE', note: 'Target reached — take profit.' }
   return { verdict: 'KEEP', note: 'Structure intact — bias unchanged.' }
+}
+
+/**
+ * Whether a position's original thesis still holds — and, unlike the plain
+ * price-vs-level check `checkSlTp` runs for auto-close, always has an answer.
+ * Prefers the live swing support/resistance of the coin/interval it was opened
+ * on (a qualitative "does the setup still make sense" read); support/resistance
+ * is only available for the currently active chart pair in this app's
+ * single-subscription data model, so for any other coin this falls back to the
+ * position's own Jev-suggested stop-loss/take-profit (`computeStopLossTakeProfit`
+ * — always set since it ATR-falls-back when there's no swing level to anchor to)
+ * via the same crossing check `checkSlTp` uses for auto-close.
+ */
+export function computePositionVerdict(
+  position: Pick<SimPositionLike, 'side'> & { stopLoss?: number; takeProfit?: number },
+  currentPrice: number,
+  support: number | null,
+  resistance: number | null,
+): Verdict {
+  if (support !== null || resistance !== null) {
+    return structureVerdict(position.side, currentPrice, support, resistance)
+  }
+  const reason = checkSlTp(position, currentPrice)
+  if (reason === 'stop_loss') return { verdict: 'CLOSE', note: 'Stop-loss hit — close position.' }
+  if (reason === 'take_profit') return { verdict: 'CLOSE', note: 'Take-profit reached — close position.' }
+  if (position.stopLoss == null && position.takeProfit == null) {
+    return { verdict: 'KEEP', note: 'No stop-loss/take-profit set for this position.' }
+  }
+  return { verdict: 'KEEP', note: 'Within stop-loss/take-profit range.' }
 }
 
 export type SlTpReason = 'stop_loss' | 'take_profit'
@@ -125,8 +147,8 @@ export function decideBotAction(
 }
 
 export interface SlTpLevels {
-  stopLoss?: number
-  takeProfit?: number
+  stopLoss: number
+  takeProfit: number
 }
 
 /**
@@ -134,7 +156,11 @@ export interface SlTpLevels {
  * support/resistance, then both pushed further away by an ATR-scaled buffer sized by
  * Jev's `riskWidth` score (0 = tight, hugs the raw swing level with no buffer; 2 = wide,
  * a full ATR of extra room on both the stop and the target). `riskWidthScore` outside
- * 0-2 is clamped. Either level is `undefined` when its swing level doesn't exist yet.
+ * 0-2 is clamped. When a side has no swing level to anchor to yet (`nearestSwingLevels`
+ * returned `null` — e.g. price is making a fresh high/low with nothing to reference),
+ * falls back to a pure ATR-multiple distance from price (1x ATR at tight, up to 3x at
+ * wide) instead of leaving that level unset — every position gets some protection,
+ * even one structure alone can't currently place.
  */
 export function computeStopLossTakeProfit(
   side: 'long' | 'short',
@@ -146,13 +172,14 @@ export function computeStopLossTakeProfit(
 ): SlTpLevels {
   const widthFrac = Math.max(0, Math.min(1, riskWidthScore / 2))
   const buffer = price * (atrPercent / 100) * widthFrac
+  const fallbackDistance = price * (atrPercent / 100) * (1 + widthFrac * 2)
   const near = side === 'long' ? swingSupport : swingResistance
   const far = side === 'long' ? swingResistance : swingSupport
   const nearSign = side === 'long' ? -1 : 1
   const farSign = side === 'long' ? 1 : -1
   return {
-    stopLoss: near != null ? near + nearSign * buffer : undefined,
-    takeProfit: far != null ? far + farSign * buffer : undefined,
+    stopLoss: near != null ? near + nearSign * buffer : price + nearSign * fallbackDistance,
+    takeProfit: far != null ? far + farSign * buffer : price + farSign * fallbackDistance,
   }
 }
 
