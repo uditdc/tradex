@@ -120,6 +120,7 @@ function PositionsTab() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="text-term-muted border-term-border border-b text-[10px] tracking-widest uppercase">
+              <th className="px-1.5 py-1 text-left font-normal">Session</th>
               <th className="px-1.5 py-1 text-left font-normal">Coin</th>
               <th className="px-1.5 py-1 text-left font-normal">Side</th>
               <th className="px-1.5 py-1 text-right font-normal">Size</th>
@@ -135,6 +136,7 @@ function PositionsTab() {
           <tbody>
             {positionRows.map(({ position, pnl, cur, verdict }) => (
               <tr key={position.id} className="border-term-border/60 border-b tabular-nums">
+                <td className="text-term-muted px-1.5 py-1.5">{position.sessionName ?? '—'}</td>
                 <td className="px-1.5 py-1.5 font-semibold">{position.coin}</td>
                 <td className={`px-1.5 py-1.5 font-semibold ${position.side === 'long' ? 'text-term-up' : 'text-term-down'}`}>
                   {position.side.toUpperCase()}
@@ -214,6 +216,7 @@ function HistoryTab() {
       <thead>
         <tr className="text-term-muted border-term-border border-b text-[10px] tracking-widest uppercase">
           <th className="px-1.5 py-1 text-left font-normal">Time</th>
+          <th className="px-1.5 py-1 text-left font-normal">Session</th>
           <th className="px-1.5 py-1 text-left font-normal">Coin</th>
           <th className="px-1.5 py-1 text-left font-normal">Side</th>
           <th className="px-1.5 py-1 text-right font-normal">Size</th>
@@ -228,6 +231,7 @@ function HistoryTab() {
         {ledger.slice(0, 30).map((entry) => (
           <tr key={entry.id} className="border-term-border/60 border-b tabular-nums">
             <td className="text-term-muted px-1.5 py-1.5">{fmtClock(entry.closedAt)}</td>
+            <td className="text-term-muted px-1.5 py-1.5">{entry.sessionName ?? '—'}</td>
             <td className="px-1.5 py-1.5 font-semibold">{entry.coin}</td>
             <td className={`px-1.5 py-1.5 font-semibold ${entry.side === 'long' ? 'text-term-up' : 'text-term-down'}`}>
               {entry.side.toUpperCase()}

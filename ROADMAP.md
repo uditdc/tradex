@@ -1275,6 +1275,41 @@ Notes:
   this session (same limitation as recent phases).
 - `pnpm typecheck`/`test` (103 passed, unchanged)/`lint`/`build` all green.
 
+## Phase 25 — Named trading sessions
+- [x] Sessions were anonymous — `useConfigStore` only tracked `botEnabled` +
+  `sessionStartedAt`, so positions and trade history had no durable link back
+  to the run that produced them. Replaced `sessionStartedAt` with
+  `activeSession: TradingSession | null` (`{ id, name, startedAt }`), and
+  `startSession` now takes a `name`. A new "Name" field in the Session
+  Settings dialog (`AiPanel`) lets the user type one before starting; left
+  blank, it falls back to the active strategy's label — same visible
+  behavior as before for anyone who doesn't bother naming a session. Once a
+  session is running, the field shows the name read-only (renaming a live
+  session isn't supported — a session's identity is fixed at start) and the
+  panel header shows the session name instead of just the strategy label.
+- [x] `SimPosition` and `LedgerEntry` gained optional `sessionId`/`sessionName`
+  fields (optional so positions/trades persisted before this phase still
+  load without a migration). `useTradingBot` stamps the active session onto
+  every position it opens; `closePosition` (`store/index.ts`) copies those
+  same two fields onto the booked ledger entry. `ActivityBar`'s Positions and
+  Trade History tables both gained a Session column (`sessionName ?? '—'`).
+- [x] `CLAUDE.md`'s trading-session paragraph rewritten for the named-session
+  shape and the `sessionId`/`sessionName` tagging.
+- Deliberately did not build a session browser/filter UI or a durable
+  `sessions` IndexedDB store — `activeSession` already survives a page
+  refresh via `useConfigStore`'s existing `persist` middleware, and nothing
+  in this phase needs to read back a list of past sessions; denormalizing
+  `sessionName` onto each position/ledger row was enough for what was asked
+  (tracking positions/trade history against the named session). Revisit if a
+  "browse past sessions" view is ever wanted.
+- Not visually verified in a browser — no browser-automation tool available
+  this session (same limitation as recent phases).
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 103 passed (2 of
+  `config.test.ts`'s existing session tests updated for the renamed
+  `activeSession` field and `startSession`'s new required argument, no new
+  tests added — this phase is store-shape plumbing plus JSX, not new pure
+  logic).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

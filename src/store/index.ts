@@ -182,6 +182,8 @@ export const useAppStore = create<AppStore>((set) => ({
         openedAt: position.openedAt,
         closedAt,
         reason,
+        sessionId: position.sessionId,
+        sessionName: position.sessionName,
       }
       void addLedgerEntry(entry)
       void deletePosition(id)

@@ -16,6 +16,9 @@ export interface SimPosition {
   openedAt: number
   stopLoss?: number
   takeProfit?: number
+  /** The trading session this position was opened under. Optional so positions persisted before named sessions still load. */
+  sessionId?: number
+  sessionName?: string
 }
 
 export async function savePosition(position: SimPosition): Promise<void> {

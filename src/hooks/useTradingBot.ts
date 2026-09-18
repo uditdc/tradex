@@ -76,6 +76,7 @@ export function useTradingBot(): void {
           simSizeUsd,
           simLeverage,
         } = useAppStore.getState()
+        const { activeSession } = useConfigStore.getState()
         const held = positions.find((p) => p.coin === coin) ?? null
 
         let result
@@ -131,6 +132,8 @@ export function useTradingBot(): void {
           entryPrice: activePrice,
           stopLoss,
           takeProfit,
+          sessionId: activeSession?.id,
+          sessionName: activeSession?.name,
         })
       } catch (err) {
         console.error(`trading bot decision failed for ${coin}:`, err)

@@ -18,11 +18,17 @@ every close is booked to a realized-PnL ledger (trade history, session PnL). The
 other AI provider in this app — no narrative LLM, no "AI read," no "/" ask mode; those
 were removed. Jev (`/api/bot-decision`) is the only model call this app ever makes.
 
-A trading **session** is just Auto Mode being on: explicit Start Session / End Session
-buttons in `AiPanel` (`useConfigStore`'s `botEnabled` + `sessionStartedAt`, both
-persisted — a reloaded tab resumes a running session rather than silently dropping
-it, and `useTradingBot`'s poll loop, and therefore every Jev call, only ever runs
-while a session is active). Ending a session opens a confirm dialog
+A trading **session** is just Auto Mode being on, under a name: explicit Start Session /
+End Session buttons in `AiPanel` (`useConfigStore`'s `botEnabled` + `activeSession:
+TradingSession | null`, both persisted — a reloaded tab resumes the same named session
+rather than silently dropping it, and `useTradingBot`'s poll loop, and therefore every
+Jev call, only ever runs while a session is active). The name defaults to the active
+strategy's label at start time (the Session Settings dialog's Name field, blank =
+default) but is otherwise just a user label — positions opened and ledger entries
+booked while that session is active are tagged with its `id`/`name`
+(`SimPosition`/`LedgerEntry`'s optional `sessionId`/`sessionName`, copied through
+`closePosition` when a position closes) so `ActivityBar`'s Positions and Trade History
+tabs can show which session produced each row. Ending a session opens a confirm dialog
 (`components/ui/dialog.tsx`) that closes every open position at the best available
 price (`resolveClosePrice`, `lib/closePosition.ts` — live price if on hand, else a
 one-off Hyperliquid fetch, same fallback `ActivityBar`'s manual close already used)

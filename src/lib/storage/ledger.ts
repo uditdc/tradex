@@ -16,6 +16,9 @@ export interface LedgerEntry {
   openedAt: number
   closedAt: number
   reason: CloseReason
+  /** The trading session the closed position was opened under. Optional so ledger entries booked before named sessions still load. */
+  sessionId?: number
+  sessionName?: string
 }
 
 type NewLedgerEntry = Omit<LedgerEntry, 'id'>

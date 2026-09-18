@@ -8,7 +8,7 @@ beforeEach(() => {
     defaultInterval: '1h',
     lookback: 210,
     botEnabled: false,
-    sessionStartedAt: null,
+    activeSession: null,
     activeStrategy: 'momentum',
   })
 })
@@ -41,17 +41,18 @@ describe('useConfigStore', () => {
 
   it('startSession/endSession flip botEnabled, off by default', () => {
     expect(useConfigStore.getState().botEnabled).toBe(false)
-    useConfigStore.getState().startSession()
+    useConfigStore.getState().startSession('My Session')
     expect(useConfigStore.getState().botEnabled).toBe(true)
     useConfigStore.getState().endSession()
     expect(useConfigStore.getState().botEnabled).toBe(false)
   })
 
-  it('startSession records when the session started; endSession clears it', () => {
-    expect(useConfigStore.getState().sessionStartedAt).toBeNull()
-    useConfigStore.getState().startSession()
-    expect(useConfigStore.getState().sessionStartedAt).not.toBeNull()
+  it('startSession records a named session; endSession clears it', () => {
+    expect(useConfigStore.getState().activeSession).toBeNull()
+    useConfigStore.getState().startSession('My Session')
+    expect(useConfigStore.getState().activeSession).toMatchObject({ name: 'My Session' })
+    expect(useConfigStore.getState().activeSession?.startedAt).not.toBeNull()
     useConfigStore.getState().endSession()
-    expect(useConfigStore.getState().sessionStartedAt).toBeNull()
+    expect(useConfigStore.getState().activeSession).toBeNull()
   })
 })

@@ -126,11 +126,12 @@ export function AiPanel() {
   const lastDecisionAt = useAppStore((s) => s.lastDecisionAt)
   const positions = useAppStore((s) => s.positions)
   const botEnabled = useConfigStore((s) => s.botEnabled)
-  const sessionStartedAt = useConfigStore((s) => s.sessionStartedAt)
+  const activeSession = useConfigStore((s) => s.activeSession)
   const startSession = useConfigStore((s) => s.startSession)
   const endSession = useConfigStore((s) => s.endSession)
   const activeStrategy = useConfigStore((s) => s.activeStrategy)
   const setActiveStrategy = useConfigStore((s) => s.setActiveStrategy)
+  const activeStrategyLabel = STRATEGIES.find((s) => s.id === activeStrategy)?.label ?? ''
 
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -142,6 +143,7 @@ export function AiPanel() {
   const [endDialogOpen, setEndDialogOpen] = useState(false)
   const [ending, setEnding] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sessionNameDraft, setSessionNameDraft] = useState('')
 
   async function handleConfirmEnd() {
     setEnding(true)
@@ -157,11 +159,16 @@ export function AiPanel() {
     } finally {
       setEnding(false)
       setEndDialogOpen(false)
+      setSessionNameDraft('')
       endSession()
     }
   }
 
-  const seconds = secondsUntilNextDecision(now, lastDecisionAt ?? sessionStartedAt)
+  function handleStart() {
+    startSession(sessionNameDraft.trim() || activeStrategyLabel)
+  }
+
+  const seconds = secondsUntilNextDecision(now, lastDecisionAt ?? activeSession?.startedAt ?? null)
 
   return (
     <div className="border-term-border bg-term-panel flex w-80 shrink-0 flex-col overflow-y-auto border-l">
@@ -174,8 +181,8 @@ export function AiPanel() {
           <span className="text-[11px] font-semibold tracking-widest text-[#F5F0E6]">
             JEV{' '}
             <span className="text-term-muted font-normal">
-              · {STRATEGIES.find((s) => s.id === activeStrategy)?.label.toUpperCase()}
-              {sessionStartedAt !== null && <> · {formatElapsed(now - sessionStartedAt)}</>}
+              · {(activeSession?.name ?? activeStrategyLabel).toUpperCase()}
+              {activeSession !== null && <> · {formatElapsed(now - activeSession.startedAt)}</>}
             </span>
           </span>
         </div>
@@ -189,7 +196,7 @@ export function AiPanel() {
         </button>
         <button
           type="button"
-          onClick={botEnabled ? () => setEndDialogOpen(true) : startSession}
+          onClick={botEnabled ? () => setEndDialogOpen(true) : handleStart}
           className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
             botEnabled ? 'border-term-amber text-term-amber' : 'border-term-border text-term-muted hover:border-term-amber hover:text-term-amber'
           }`}
@@ -206,6 +213,21 @@ export function AiPanel() {
               Changes apply immediately — switching strategy while a session is active restarts the poll loop.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-term-muted w-8 shrink-0 text-[10px]">Name</span>
+            {botEnabled && activeSession ? (
+              <span className="text-term-amber text-xs">{activeSession.name}</span>
+            ) : (
+              <input
+                type="text"
+                value={sessionNameDraft}
+                onChange={(e) => setSessionNameDraft(e.target.value)}
+                placeholder={activeStrategyLabel}
+                className="border-term-border text-term-amber placeholder:text-term-muted rounded-sm border bg-transparent px-2 py-1 text-xs"
+              />
+            )}
+          </div>
 
           <div className="flex flex-col gap-2">
             <span className="text-term-muted w-8 shrink-0 text-[10px]">Strategy</span>
