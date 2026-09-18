@@ -3,6 +3,7 @@ import { TypeSafeClient } from '@typesafe-ai/sdk'
 import type { ChoiceResponse, ScoreResponse } from '@typesafe-ai/sdk'
 import { Hono } from 'hono'
 import * as momentum from './strategies/momentum'
+import * as mtfTrend from './strategies/mtfTrend'
 import * as orderbook from './strategies/orderbook'
 
 // The trading bot is opt-in (off by default), so a missing key doesn't block the
@@ -11,7 +12,7 @@ const typesafeClient = process.env.TYPESAFE_API_KEY ? new TypeSafeClient() : nul
 
 const app = new Hono()
 
-const STRATEGIES = { momentum, orderbook } as const
+const STRATEGIES = { momentum, orderbook, 'mtf-trend': mtfTrend } as const
 type StrategyId = keyof typeof STRATEGIES
 
 function isStrategyId(value: unknown): value is StrategyId {
@@ -23,7 +24,7 @@ app.post('/api/bot-decision', async (c) => {
     return c.json({ error: 'TYPESAFE_API_KEY not set in server/.env — the trading bot needs a TypeSafe API key' }, 503)
   }
 
-  const { strategy, symbol, indicators, orderBook, position } = await c.req.json()
+  const { strategy, symbol, indicators, orderBook, mtfTrend, position } = await c.req.json()
   if (!isStrategyId(strategy)) {
     return c.json({ error: `unknown strategy: ${String(strategy)}` }, 400)
   }
@@ -31,7 +32,7 @@ app.post('/api/bot-decision', async (c) => {
   try {
     const { questions, factorMeta } = STRATEGIES[strategy].buildQuestions()
     const { answers } = await typesafeClient.systemOne({
-      state: { symbol, indicators, orderBook, openPosition: position },
+      state: { symbol, indicators, orderBook, mtfTrend, openPosition: position },
       questions,
     })
 

@@ -1,4 +1,5 @@
 import type { OrderBookMetrics } from '../indicators/orderbook'
+import type { TrendSnapshot } from '../indicators/trendSnapshot'
 import type { IndicatorDict } from '../indicators/types'
 import type { StrategyId } from '../strategies/types'
 
@@ -6,6 +7,13 @@ export type BotDecision = 'buy' | 'sell' | 'hold'
 export type BotScenario = 'bull' | 'bear' | 'neutral'
 export type { StrategyId }
 export type { OrderBookMetrics }
+export type { TrendSnapshot }
+
+/** The `mtf-trend` strategy's extra request data: a `TrendSnapshot` per timeframe it looks at. */
+export interface MtfTrendContext {
+  major: TrendSnapshot
+  intermediate: TrendSnapshot
+}
 
 export interface Judgment<T extends string> {
   choice: T
@@ -67,7 +75,8 @@ export interface BotPositionContext {
  * for one coin, from the given strategy. `indicators` (base candle indicators) is
  * always sent — every strategy anchors stop-loss/take-profit to swing levels
  * regardless of what extra data it looks at. `orderBook` is only meaningful (and
- * only read server-side) for the `'orderbook'` strategy.
+ * only read server-side) for the `'orderbook'` strategy; `mtfTrend` only for
+ * `'mtf-trend'`.
  */
 export async function requestBotDecision(
   strategy: StrategyId,
@@ -75,11 +84,12 @@ export async function requestBotDecision(
   indicators: IndicatorDict,
   orderBook: OrderBookMetrics | null,
   position: BotPositionContext | null,
+  mtfTrend: MtfTrendContext | null = null,
 ): Promise<BotDecisionResult> {
   const res = await fetch('/api/bot-decision', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ strategy, symbol, indicators, orderBook, position }),
+    body: JSON.stringify({ strategy, symbol, indicators, orderBook, mtfTrend, position }),
   })
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null

@@ -13,6 +13,7 @@ type Tab = 'positions' | 'history' | 'log'
 const STRATEGY_ABBR: Record<StrategyId, string> = {
   momentum: 'MOM',
   orderbook: 'BOOK',
+  'mtf-trend': 'MTF',
 }
 
 const BOT_DECISION_CLASS: Record<BotDecision, string> = {

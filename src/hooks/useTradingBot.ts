@@ -5,6 +5,7 @@ import { intervalMs } from '../lib/hl/intervals'
 import { candleSnapshot, l2Book } from '../lib/hl/rest'
 import { MIN_CANDLES, computeAll } from '../lib/indicators'
 import { computeOrderBookMetrics } from '../lib/indicators/orderbook'
+import { computeTrendSnapshot } from '../lib/indicators/trendSnapshot'
 import { computeStopLossTakeProfit, decideBotAction, pnlForPosition } from '../lib/sim'
 import { useAppStore } from '../store'
 import { useConfigStore } from '../store/config'
@@ -13,6 +14,13 @@ import { useConfigStore } from '../store/config'
 const BOT_INTERVAL = '1m'
 const POLL_MS = 15_000
 const BOT_LOOKBACK = 210
+
+// `mtf-trend` strategy: major/intermediate timeframes it reads alongside the base 1m
+// data above. 90 bars comfortably clears `computeTrendSnapshot`'s 34-bar minimum for
+// MACD(26,9) to settle, with margin for EMA stability.
+const MTF_MAJOR_INTERVAL = '4h'
+const MTF_INTERMEDIATE_INTERVAL = '15m'
+const MTF_LOOKBACK = 90
 
 /**
  * Auto Mode: polls the active coin's 1m candles, and on each newly closed bar asks
@@ -65,6 +73,25 @@ export function useTradingBot(): void {
           }
         }
 
+        let mtfTrend = null
+        if (activeStrategy === 'mtf-trend') {
+          try {
+            const majorMs = intervalMs(MTF_MAJOR_INTERVAL)
+            const intermediateMs = intervalMs(MTF_INTERMEDIATE_INTERVAL)
+            const [majorCandles, intermediateCandles] = await Promise.all([
+              candleSnapshot(coin, MTF_MAJOR_INTERVAL, Date.now() - MTF_LOOKBACK * majorMs, Date.now()),
+              candleSnapshot(coin, MTF_INTERMEDIATE_INTERVAL, Date.now() - MTF_LOOKBACK * intermediateMs, Date.now()),
+            ])
+            mtfTrend = {
+              major: computeTrendSnapshot(majorCandles),
+              intermediate: computeTrendSnapshot(intermediateCandles),
+            }
+          } catch (err) {
+            console.error(`trading bot: failed to fetch multi-timeframe trend data for ${coin}:`, err)
+            return
+          }
+        }
+
         const {
           positions,
           openPosition,
@@ -88,6 +115,7 @@ export function useTradingBot(): void {
             indicators,
             orderBook,
             held ? { side: held.side, entryPrice: held.entryPrice, unrealizedPnl: pnlForPosition(held, activePrice) } : null,
+            mtfTrend,
           )
         } catch (err) {
           if (!lastErrorToastedRef.current) {

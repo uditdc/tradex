@@ -140,8 +140,20 @@ earning its keep yet.
   `imbalance` (bid vs. ask depth within ±0.5% of mid), `spreadPercent`, `depthRatio`
   (total window depth vs. top-of-book size). Still receives the base `indicators` too,
   for swing-level SL/TP anchoring and price-structure context.
+- **`mtf-trend`**: Elder-style triple screen. A 4h RSI 14 + MACD(12,26,9) read
+  (`computeTrendSnapshot`, `lib/indicators/trendSnapshot.ts`, pure, tested — built on
+  the `rsi`/`macd` primitives, `macd.ts` alongside it) sets the major trend; a 15m
+  read of the same shape sets the intermediate trend; the always-sent base 1m
+  `indicators` only time *when* to enter/exit in whatever direction the two agree
+  on — `server/strategies/mtfTrend.ts`'s `action` question is explicitly instructed
+  to hold rather than trade when major/intermediate disagree, since that alignment
+  rule is a judgment call across noisy timeframes, not a hard threshold that belongs
+  in `decideBotAction`. `useTradingBot.ts` fetches the two extra candle series
+  (`MTF_MAJOR_INTERVAL`/`MTF_INTERMEDIATE_INTERVAL`) every poll, same as the
+  `orderbook` strategy re-fetches `l2Book` every poll — deliberately not cached
+  across polls despite 4h/15m barely changing tick to tick.
 
-Adding a third strategy: add its id to `StrategyId` (`lib/strategies/types.ts`) and
+Adding another strategy: add its id to `StrategyId` (`lib/strategies/types.ts`) and
 `STRATEGIES` (both there and `server/index.ts`'s `STRATEGIES` map), a
 `server/strategies/<id>.ts` exporting `buildQuestions()`, and — only if it needs data
 beyond `indicators` — a branch in `useTradingBot.ts`'s fetch and a new optional field

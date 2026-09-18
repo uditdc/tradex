@@ -1310,6 +1310,41 @@ Notes:
   tests added — this phase is store-shape plumbing plus JSX, not new pure
   logic).
 
+## Phase 26 — Multi-timeframe trend strategy (`mtf-trend`)
+- [x] New strategy, an Elder-style "triple screen" setup: a 4h RSI 14 + MACD(12,26,9)
+  read sets the major trend, a 15m read of the same shape sets the intermediate
+  trend, and the always-fetched base 1m indicators (EMA stack, RSI) only time
+  *when* to enter/exit in whatever direction the two agree on — never to trade
+  against them. `server/strategies/mtfTrend.ts`'s `action` question is explicitly
+  worded to hold when major/intermediate disagree, since "do the higher timeframes
+  agree" is a judgment call best left to Jev's `alignment` factor, not a
+  deterministic gate bolted onto `decideBotAction`.
+- [x] New pure indicators: `lib/indicators/macd.ts` (`macd()`, built on the existing
+  `ema()` primitive — fast/slow EMA difference, EMA-of-that-line signal, histogram)
+  and `lib/indicators/trendSnapshot.ts` (`computeTrendSnapshot()`, RSI 14 + MACD off
+  one candle series — the 4h and 15m calls are two separate invocations of the same
+  function). Both fully tested, `macd.ts` cross-checked against `ema()` directly at
+  several bars plus a small hand-traceable short-period example, matching the
+  existing indicator test conventions.
+- [x] `useTradingBot.ts` fetches two extra candle series (`MTF_MAJOR_INTERVAL` =
+  `'4h'`, `MTF_INTERMEDIATE_INTERVAL` = `'15m'`, 90-bar lookback — comfortably above
+  `computeTrendSnapshot`'s exact 34-bar minimum) only when `activeStrategy ===
+  'mtf-trend'`, same branch-per-strategy pattern the `orderbook` strategy already
+  established for `l2Book`. Deliberately re-fetches both every 15s poll rather than
+  caching across polls (4h/15m barely move tick to tick) — same simplicity
+  trade-off the `orderbook` strategy already makes re-fetching the book every poll.
+- [x] `StrategyId`/`STRATEGIES` (`lib/strategies/types.ts`, `server/index.ts`),
+  `STRATEGY_ABBR` (`ActivityBar.tsx`), and `requestBotDecision`'s new optional
+  `mtfTrend` parameter (`lib/ai/bot.ts`) all extended — no changes needed in
+  `AiPanel.tsx`, whose strategy picker and factor list already render generically
+  off `STRATEGIES`/`factors` arrays (`flex-1` pills, not a fixed 2-up grid).
+- Not visually verified in a browser — no browser-automation tool available this
+  session (same limitation as recent phases); not live-verified against the real
+  TypeSafe API either (unlike Phase 19's order-book strategy) — no running `pnpm
+  dev` session available this time to call through to a live Jev response.
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 111 passed (8 new: 5 for
+  `macd`, 3 for `computeTrendSnapshot`).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)
@@ -1322,10 +1357,11 @@ Notes:
   only runs while a browser tab has the app mounted (see `useTradingBot`); moving
   it server-side needs its own durable storage (IndexedDB isn't reachable from
   Node) — raised, not started
-- A third strategy — e.g. Funding & Open Interest (`metaAndAssetCtxs`, already
-  fetched elsewhere in the app but not fed to the bot) for a carry/crowding read
-  instead of a price-structure or book-pressure one (Phase 19 added the second
-  strategy, Order Book Pressure)
+- A fourth strategy — e.g. Funding & Open Interest (`metaAndAssetCtxs`, already
+  fetched elsewhere in the app but not fed to the bot) for a carry/crowding read,
+  distinct from momentum's price structure, order book's book pressure, and
+  mtf-trend's RSI/MACD alignment (Phase 19 added Order Book Pressure, Phase 26
+  added MTF Trend)
 - Tighten the `orderbook` strategy's `spread` rubric with concrete numeric bands
   (e.g. "< 0.05%" / "0.05–0.2%" / "> 0.2%") instead of "relative to typical" —
   Phase 19's live verification showed a 15x wider spread barely moved the score

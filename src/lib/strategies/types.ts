@@ -1,4 +1,4 @@
-export type StrategyId = 'momentum' | 'orderbook'
+export type StrategyId = 'momentum' | 'orderbook' | 'mtf-trend'
 
 export interface StrategyMeta {
   id: StrategyId
@@ -21,5 +21,10 @@ export const STRATEGIES: StrategyMeta[] = [
     id: 'orderbook',
     label: 'Order Book',
     description: 'Live bid/ask depth imbalance, spread, and book depth from l2Book.',
+  },
+  {
+    id: 'mtf-trend',
+    label: 'MTF Trend',
+    description: '4h + 15m RSI/MACD trend alignment (triple screen), timed with 1m momentum.',
   },
 ]
