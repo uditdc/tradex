@@ -27,6 +27,14 @@ const BOT_SCENARIO_CLASS: Record<BotScenario, string> = {
   neutral: 'text-term-muted',
 }
 
+function fmtDuration(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`
+}
+
+function fmtCostUsd(usd: number): string {
+  return `$${usd.toFixed(6)}`
+}
+
 function fmtClock(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-US', { hour12: false })
 }
@@ -256,9 +264,11 @@ function HistoryTab() {
   )
 }
 
+const LOG_GRID_COLS = 'grid-cols-[70px_50px_50px_80px_1fr_50px_100px_70px_60px]'
+
 function LogRow({ entry }: { entry: BotLogEntry }) {
   return (
-    <div className="border-term-border/60 grid grid-cols-[70px_50px_50px_80px_1fr_50px_100px] items-center gap-2 border-b py-1 text-[11px] tabular-nums">
+    <div className={`border-term-border/60 grid ${LOG_GRID_COLS} items-center gap-2 border-b py-1 text-[11px] tabular-nums`}>
       <span className="text-term-muted">{fmtClock(entry.timestamp)}</span>
       <span className="text-[#F5F0E6]">{entry.coin}</span>
       <span className="text-term-muted">{STRATEGY_ABBR[entry.strategy]}</span>
@@ -275,6 +285,8 @@ function LogRow({ entry }: { entry: BotLogEntry }) {
           style={{ width: `${Math.round(entry.action.confidence * 100)}%` }}
         />
       </div>
+      <span className="text-term-muted text-right">{fmtCostUsd(entry.costUsd)}</span>
+      <span className="text-term-muted text-right">{fmtDuration(entry.durationMs)}</span>
     </div>
   )
 }
@@ -286,7 +298,7 @@ function LogTab() {
 
   return (
     <div className="flex flex-col">
-      <div className="text-term-muted grid grid-cols-[70px_50px_50px_80px_1fr_50px_100px] gap-2 pb-1 text-[9px] tracking-widest uppercase">
+      <div className={`text-term-muted grid ${LOG_GRID_COLS} gap-2 pb-1 text-[9px] tracking-widest uppercase`}>
         <span>Time</span>
         <span>Coin</span>
         <span>Strat</span>
@@ -294,6 +306,8 @@ function LogTab() {
         <span>Call</span>
         <span className="text-right">Conf</span>
         <span>Conviction</span>
+        <span className="text-right">Cost</span>
+        <span className="text-right">Took</span>
       </div>
       {botLog.slice(0, 40).map((entry, i) => (
         <LogRow key={i} entry={entry} />

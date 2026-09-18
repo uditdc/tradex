@@ -1345,6 +1345,27 @@ Notes:
 - `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 111 passed (8 new: 5 for
   `macd`, 3 for `computeTrendSnapshot`).
 
+## Phase 27 — Cost and latency in the Jev call log
+- [x] `BotDecisionResult` gained `costUsd`/`durationMs`. `server/index.ts` times the
+  `systemOne` call itself (`Date.now()` around it, excluding this app's own
+  fetch/JSON overhead) and prices `usage.input_tokens` against Jev 1.13's
+  published rate — `docs.typesafe.ai/models.md`: $0.042 per Mtok input, output
+  tokens free, so `costUsd = usage.input_tokens / 1e6 * 0.042`. No cost field
+  exists on the SDK response itself, only `usage`/`model` — this is computed
+  client-of-the-SDK-side, not read off the wire.
+- [x] `ActivityBar`'s Jev call log (`LogTab`/`LogRow`) gained two right-aligned
+  columns, Cost (`$0.000012`-style, 6 decimals — per-call cost is sub-cent) and
+  Took (`850ms` / `1.2s`). Both strategy-agnostic — every strategy's response
+  carries them the same way, no per-strategy branching needed.
+- Not live-verified against the real TypeSafe API (no running `pnpm dev` session
+  this time) and not visually verified in a browser — same limitation as recent
+  phases; the $/Mtok figure and the "output is free" claim come from
+  `docs.typesafe.ai/models.md`, not from an observed response.
+- `pnpm typecheck`/`lint`/`build` all green; `pnpm test` 111 passed (existing
+  `botLog.test.ts` fixture updated for the two new required fields, no new
+  tests added — this phase is plumbing two already-available numbers through,
+  not new pure logic).
+
 ## Parking lot (ideas, not commitments)
 - Alerts: bot decision flips, funding flip, RSI extreme → Sonner toast + sound
 - Configurable confidence threshold for Auto Mode (currently 0 — acts on everything)

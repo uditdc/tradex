@@ -202,6 +202,12 @@ one `systemOne` call, then shape the generic response below from `factorMeta`. O
   model to output a precise price number is a poor fit for these primitives
   (they're typed judgments over described criteria, not numeric regression), so
   price math stays in code and Jev only steers the risk-width input to it.
+- `costUsd`/`durationMs`: not part of Jev's judgment — `server/index.ts` measures
+  wall-clock time around the `systemOne` call and prices `usage.input_tokens`
+  against Jev 1.13's published rate (`PRICE_PER_INPUT_MTOK_USD`, $0.042/Mtok —
+  output tokens are free, so cost is input-only). Surfaced as two extra columns
+  in the Jev call log (`ActivityBar`'s Log tab) so a session's Auto Mode cost and
+  latency are visible without leaving the app.
 
 No prose, no parsing needed — these are typed judgments, not a completion to
 strict-parse. Every strategy's full question set (`scenario`, `action`,

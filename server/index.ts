@@ -10,6 +10,10 @@ import * as orderbook from './strategies/orderbook'
 // server at startup — it just disables /api/bot-decision with a clear error.
 const typesafeClient = process.env.TYPESAFE_API_KEY ? new TypeSafeClient() : null
 
+// Jev 1.13 pricing (docs.typesafe.ai/models.md): $0.042 per Mtok of input; output
+// tokens are free, so cost is input-only.
+const PRICE_PER_INPUT_MTOK_USD = 0.042
+
 const app = new Hono()
 
 const STRATEGIES = { momentum, orderbook, 'mtf-trend': mtfTrend } as const
@@ -31,10 +35,13 @@ app.post('/api/bot-decision', async (c) => {
 
   try {
     const { questions, factorMeta } = STRATEGIES[strategy].buildQuestions()
-    const { answers } = await typesafeClient.systemOne({
+    const startedAt = Date.now()
+    const { answers, usage } = await typesafeClient.systemOne({
       state: { symbol, indicators, orderBook, mtfTrend, openPosition: position },
       questions,
     })
+    const durationMs = Date.now() - startedAt
+    const costUsd = (usage.input_tokens / 1_000_000) * PRICE_PER_INPUT_MTOK_USD
 
     // Which question set got built is only known at request time (the caller picked a
     // strategy), so `answers` can't carry per-key literal types the way a single fixed
@@ -52,6 +59,8 @@ app.post('/api/bot-decision', async (c) => {
         const answer = answers[key] as ScoreResponse
         return { key, label, kind, score: answer.score, confidence: answer.confidence }
       }),
+      costUsd,
+      durationMs,
     })
   } catch (err) {
     console.error('TypeSafe bot-decision request failed:', err)

@@ -12,6 +12,8 @@ const ENTRY: BotLogEntry = {
   action: { choice: 'buy', confidence: 0.8, probabilities: { buy: 0.8, sell: 0.1, hold: 0.1 } },
   riskWidth: { score: 1, confidence: 0.5 },
   factors: [{ key: 'trend', label: 'Trend', kind: 'directional', score: 3, confidence: 0.8 }],
+  costUsd: 0.000012,
+  durationMs: 850,
 }
 
 beforeEach(() => {

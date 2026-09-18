@@ -62,6 +62,10 @@ export interface BotDecisionResult {
   action: Judgment<BotDecision>
   factors: FactorEntry[]
   riskWidth: FactorScore
+  /** Jev 1.13 is priced per input token only (output tokens are free) — see `server/index.ts`. */
+  costUsd: number
+  /** Wall-clock time the `systemOne` call itself took, measured server-side (excludes this app's own fetch/JSON overhead). */
+  durationMs: number
 }
 
 export interface BotPositionContext {
